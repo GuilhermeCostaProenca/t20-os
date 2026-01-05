@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: t20os_db
+    environment:
+      POSTGRES_USER: t20
+      POSTGRES_PASSWORD: t20
+      POSTGRES_DB: t20os
+    ports:
+      - "5432:5432"
+    volumes:
+      - t20os_pg:/var/lib/postgresql/data
+
+volumes:
+  t20os_pg:

@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  system      String   @default("TORMENTA_20")
+  description String? 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  characters  Character[]
+}
+
+model Character {
+  id         String   @id @default(cuid())
+  campaignId String
+  name       String
+  role       String?  // "Jogador", "NPC", etc. (no começo)
+  level      Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
