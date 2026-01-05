@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tormenta 20 OS
 
-## Getting Started
+Ferramenta privada para rodar mesas Tormenta 20 com Next.js (App Router) + TypeScript, Tailwind + shadcn/ui e Prisma com PostgreSQL.
 
-First, run the development server:
+## Como rodar
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Configure o `.env` com `DATABASE_URL` (já existe um exemplo).
+2. Suba o banco:
+   ```bash
+   docker compose up -d
+   ```
+3. Instale dependências:
+   ```bash
+   npm install
+   ```
+4. Rode as migrações Prisma:
+   ```bash
+   npx prisma migrate dev --name init
+   ```
+5. Suba o app:
+   ```bash
+   npm run dev
+   ```
+6. Acesse `http://localhost:3000`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Rotas principais
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/` Landing premium temática Tormenta 20.
+- `/app` Dashboard de campanhas com criação/listagem.
+- `/app/campaign/[id]` Cockpit da campanha com tabs (Personagens CRUD + placeholders).
+- APIs:
+  - `GET/POST /api/campaigns`
+  - `GET/POST /api/campaigns/[id]/characters`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Próximos passos
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Compêndio vivo com filtros e IA de resumo.
+- Mesa ao vivo com rolagens, timers e log de eventos.
+- Sessões com gravação, replay textual e compartilhamento.
+- Autenticação e RBAC simples para grupos e convidados.
