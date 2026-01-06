@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Clock3, NotebookPen, Shield, Sparkles, Swords } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Clock3, NotebookPen, QrCode, Shield, Sparkles, Swords } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { generateQrDataUrl } from "@/lib/qr";
 import { useSession } from "./session-context";
 
 function formatElapsed(ms: number) {
@@ -37,6 +38,15 @@ function formatElapsed(ms: number) {
     .toString()
     .padStart(2, "0");
   return `${hours}:${minutes}:${seconds}`;
+}
+
+function randomRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }
 
 export function SessionDialog() {
@@ -56,6 +66,27 @@ export function SessionDialog() {
   const [note, setNote] = useState("");
   const [npc, setNpc] = useState("");
   const [mod, setMod] = useState(0);
+  const [roomCode, setRoomCode] = useState("");
+  const [qrData, setQrData] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [revealType, setRevealType] = useState<"npc" | "item" | "image" | "note">("note");
+  const [revealTitle, setRevealTitle] = useState("");
+  const [revealContent, setRevealContent] = useState("");
+  const [revealImage, setRevealImage] = useState("");
+  const [revealStatus, setRevealStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("t20-room-code");
+    const code = stored || randomRoomCode();
+    setRoomCode(code);
+    if (!stored) localStorage.setItem("t20-room-code", code);
+  }, []);
+
+  const roomLink =
+    typeof window !== "undefined" && roomCode
+      ? `${window.location.origin}/play/${roomCode}`
+      : "";
 
   const events = useMemo(
     () =>
@@ -72,6 +103,60 @@ export function SessionDialog() {
 
   const timerLabel = state.running ? "Pausar" : state.startedAt ? "Retomar" : "Iniciar";
 
+  async function handleGenerateQr() {
+    if (!roomLink) return;
+    setQrLoading(true);
+    try {
+      const dataUrl = await generateQrDataUrl(roomLink);
+      setQrData(dataUrl);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!roomLink) return;
+    await navigator.clipboard.writeText(roomLink);
+    setRevealStatus("Link copiado");
+    setTimeout(() => setRevealStatus(null), 1500);
+  }
+
+  async function handleRevealSubmit() {
+    if (!roomCode || !revealTitle.trim()) {
+      setRevealStatus("Preencha o room code e o título.");
+      return;
+    }
+    setRevealStatus("Enviando...");
+    try {
+      const res = await fetch("/api/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          type: revealType,
+          title: revealTitle,
+          content: revealContent,
+          imageUrl: revealImage || undefined,
+          visibility: "players",
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Falha ao revelar");
+      }
+      setRevealStatus("Enviado para jogadores");
+      setRevealContent("");
+      setRevealImage("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar";
+      setRevealStatus(msg);
+    } finally {
+      setTimeout(() => setRevealStatus(null), 2000);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -80,13 +165,37 @@ export function SessionDialog() {
           <span className="hidden sm:inline">Modo sessão</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="chrome-panel max-w-4xl border-white/10 bg-card/90 p-0 text-left backdrop-blur">
+      <DialogContent className="chrome-panel max-w-5xl border-white/10 bg-card/90 p-0 text-left backdrop-blur">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>Modo Sessão</DialogTitle>
           <DialogDescription>
-            Timer, rolagens, NPCs e notas rápidas — tudo registrado no log da mesa.
+            Timer, rolagens, NPCs, notas rápidas e revelações para jogadores.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-wrap items-center gap-3 px-6">
+          <Badge className="border-primary/25 bg-primary/10 text-primary">
+            Room code: {roomCode || "—"}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={copyLink} disabled={!roomLink}>
+            Copiar link
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleGenerateQr} disabled={!roomLink || qrLoading}>
+            <QrCode className="h-4 w-4" />
+            QR Code
+          </Button>
+          {qrData ? (
+            <img
+              src={qrData}
+              alt="QR Code para jogadores"
+              className="h-20 w-20 rounded-lg border border-white/10 bg-white/5 p-1"
+            />
+          ) : null}
+          {revealStatus ? (
+            <span className="text-xs text-muted-foreground">{revealStatus}</span>
+          ) : null}
+        </div>
+
         <div className="grid gap-4 px-6 pb-6 lg:grid-cols-[1.2fr_1fr]">
           <Card className="chrome-panel border-white/10 bg-black/30">
             <CardHeader className="space-y-3">
@@ -202,6 +311,70 @@ export function SessionDialog() {
                     Rolar
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="px-6 pb-6">
+          <Card className="chrome-panel border-white/10 bg-black/30">
+            <CardHeader className="space-y-2">
+              <div className="flex items-center justify-between">
+                <CardTitle>Revelar para jogadores</CardTitle>
+                <Badge variant="outline" className="text-muted-foreground">
+                  /play/{roomCode || "----"}
+                </Badge>
+              </div>
+              <CardDescription>Envie NPCs, itens, imagens ou notas curtas.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="space-y-1 md:col-span-1">
+                  <label className="text-sm text-muted-foreground">Tipo</label>
+                  <select
+                    value={revealType}
+                    onChange={(e) => setRevealType(e.target.value as typeof revealType)}
+                    className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                  >
+                    <option value="npc">NPC</option>
+                    <option value="item">Item</option>
+                    <option value="image">Imagem</option>
+                    <option value="note">Nota</option>
+                  </select>
+                </div>
+                <div className="space-y-1 md:col-span-3">
+                  <label className="text-sm text-muted-foreground">Título</label>
+                  <Input
+                    value={revealTitle}
+                    onChange={(e) => setRevealTitle(e.target.value)}
+                    placeholder="Ex.: Serpente Rubra"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Texto curto</label>
+                <Textarea
+                  value={revealContent}
+                  onChange={(e) => setRevealContent(e.target.value)}
+                  rows={3}
+                  placeholder="Resumo rápido, descrição ou pista"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">URL da imagem (opcional)</label>
+                <Input
+                  value={revealImage}
+                  onChange={(e) => setRevealImage(e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleRevealSubmit} className="shadow-[0_0_18px_rgba(226,69,69,0.3)]">
+                  Mostrar
+                </Button>
+                {revealStatus ? (
+                  <span className="text-xs text-muted-foreground">{revealStatus}</span>
+                ) : null}
               </div>
             </CardContent>
           </Card>

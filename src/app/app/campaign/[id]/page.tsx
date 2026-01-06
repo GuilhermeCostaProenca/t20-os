@@ -38,6 +38,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { CharacterCreateSchema } from "@/lib/validators";
+import { Textarea } from "@/components/ui/textarea";
+import { CombatPanel } from "@/components/combat/combat-panel";
 
 type Campaign = {
   id: string;
@@ -258,6 +260,7 @@ export default function CampaignPage() {
             <TabsTrigger value="npcs">NPCs</TabsTrigger>
             <TabsTrigger value="compendium">Compêndio</TabsTrigger>
             <TabsTrigger value="sessions">Sessões</TabsTrigger>
+            <TabsTrigger value="combat">Combate</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -409,6 +412,13 @@ export default function CampaignPage() {
             title="Sessões em construção"
             description="Log de sessão, cronologia e notas rápidas ficam prontos na próxima entrega."
             icon={<Swords className="h-6 w-6" />}
+          />
+        </TabsContent>
+
+        <TabsContent value="combat">
+          <CombatPanel
+            campaignId={campaignId ?? ""}
+            characters={characters}
           />
         </TabsContent>
       </Tabs>

@@ -28,9 +28,12 @@ Ferramenta privada para rodar mesas Tormenta 20 com Next.js (App Router) + TypeS
 - `/` Landing premium temática Tormenta 20.
 - `/app` Dashboard de campanhas com criação/listagem.
 - `/app/campaign/[id]` Cockpit da campanha com tabs (Personagens CRUD + placeholders).
+- `/app/campaign/[id]` aba Combate (V0) com iniciativa/turno/ataque simples e ações pela ficha.
 - APIs:
   - `GET/POST /api/campaigns`
   - `GET/POST /api/campaigns/[id]/characters`
+  - Fichas: `GET/PUT /api/characters/[id]/sheet`
+  - Combate: `GET/POST/DELETE /api/campaigns/[id]/combat`, iniciativa/turno/ação/aplicar, `POST /api/combat/attack-from-sheet`
 
 ## Próximos passos
 

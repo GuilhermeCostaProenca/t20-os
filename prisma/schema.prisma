@@ -31,3 +31,89 @@ model Character {
 
   @@index([campaignId])
 }
+
+model Reveal {
+  id         String   @id @default(cuid())
+  roomCode   String   @db.VarChar(12)
+  type       String   @db.VarChar(12)
+  title      String   @db.VarChar(180)
+  content    Json
+  imageUrl   String?  @db.VarChar(500)
+  visibility String   @default("players") @db.VarChar(16)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+
+  @@index([roomCode, createdAt])
+}
+
+model CharacterSheet {
+  id           String   @id @default(cuid())
+  characterId  String   @unique
+  level        Int      @default(1)
+  for          Int      @default(10)
+  des          Int      @default(10)
+  con          Int      @default(10)
+  int          Int      @default(10)
+  sab          Int      @default(10)
+  car          Int      @default(10)
+  pvCurrent    Int      @default(0)
+  pvMax        Int      @default(0)
+  pmCurrent    Int      @default(0)
+  pmMax        Int      @default(0)
+  attackBonus  Int      @default(0)
+  damageFormula String   @default("1d6")
+  critRange    Int      @default(20)
+  critMultiplier Int     @default(2)
+  defenseFinal Int      @default(10)
+  notes        String?
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+model Combat {
+  id         String   @id @default(cuid())
+  campaignId String   @unique
+  isActive   Boolean  @default(true)
+  round      Int      @default(1)
+  turnIndex  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign    Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  combatants  Combatant[]
+  events      CombatEvent[]
+}
+
+model Combatant {
+  id            String   @id @default(cuid())
+  combatId      String
+  kind          String   @db.VarChar(16)
+  refId         String   @db.VarChar(120)
+  name          String   @db.VarChar(200)
+  initiative    Int      @default(0)
+  hpCurrent     Int      @default(0)
+  hpMax         Int      @default(0)
+  mpCurrent     Int      @default(0)
+  mpMax         Int      @default(0)
+  isPlayerVisible Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+
+  @@index([combatId])
+}
+
+model CombatEvent {
+  id          String   @id @default(cuid())
+  combatId    String
+  ts          DateTime @default(now())
+  actorName   String   @db.VarChar(200)
+  type        String   @db.VarChar(16)
+  payloadJson Json
+  visibility  String   @db.VarChar(12) @default("PLAYERS")
+
+  combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+
+  @@index([combatId, ts])
+}

@@ -11,12 +11,12 @@ import { Separator } from "@/components/ui/separator";
 import { Brand } from "./brand";
 
 const navItems = [
-  { href: "/app", label: "Mesa", icon: LayoutDashboard },
-  { href: "/app", label: "Personagens", icon: UserCircle2 },
-  { href: "/app", label: "NPCs", icon: ShieldHalf },
-  { href: "/app", label: "Locais", icon: MapPin },
-  { href: "/app", label: "Compêndio", icon: BookOpenText },
-  { href: "/app", label: "Diário", icon: NotebookPen },
+  { id: "mesa", href: "/app", label: "Mesa", icon: LayoutDashboard },
+  { id: "personagens", href: "/app/personagens", label: "Personagens", icon: UserCircle2 },
+  { id: "npcs", href: "/app/npcs", label: "NPCs", icon: ShieldHalf },
+  { id: "locais", href: "/app/locais", label: "Locais", icon: MapPin },
+  { id: "compendio", href: "/app/compendio", label: "Compêndio", icon: BookOpenText },
+  { id: "diario", href: "/app/diario", label: "Diário", icon: NotebookPen },
 ];
 
 export function AppSidebar() {
@@ -44,7 +44,7 @@ export function AppSidebar() {
               return (
                 <Button
                   asChild
-                  key={item.href}
+                  key={item.id}
                   variant="ghost"
                   className={cn(
                     "w-full justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition duration-200",
