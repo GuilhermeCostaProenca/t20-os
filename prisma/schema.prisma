@@ -96,6 +96,7 @@ model Combat {
   campaign    Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   combatants  Combatant[]
   events      CombatEvent[]
+  conditions  AppliedCondition[]
 }
 
 model Combatant {
@@ -117,6 +118,7 @@ model Combatant {
   updatedAt     DateTime @updatedAt
 
   combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  appliedConditions AppliedCondition[]
 
   @@index([combatId])
 }
@@ -133,6 +135,41 @@ model CombatEvent {
   combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
 
   @@index([combatId, ts])
+}
+
+model Condition {
+  id          String   @id @default(cuid())
+  rulesetId   String   @db.VarChar(50)
+  key         String   @db.VarChar(80)
+  name        String   @db.VarChar(180)
+  description String?  @db.VarChar(500)
+  effectsJson Json
+  createdAt   DateTime @default(now())
+
+  applied AppliedCondition[]
+
+  @@unique([rulesetId, key])
+  @@index([rulesetId])
+}
+
+model AppliedCondition {
+  id                String   @id @default(cuid())
+  combatId          String
+  targetCombatantId String
+  conditionId       String
+  sourceEventId     String?
+  expiresAtTurn     Int?
+  createdAt         DateTime @default(now())
+
+  combat      Combat      @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  target      Combatant   @relation(fields: [targetCombatantId], references: [id], onDelete: Cascade)
+  condition   Condition   @relation(fields: [conditionId], references: [id], onDelete: Restrict)
+  sourceEvent CombatEvent? @relation(fields: [sourceEventId], references: [id], onDelete: SetNull)
+
+  @@index([combatId])
+  @@index([targetCombatantId])
+  @@index([conditionId])
+  @@index([sourceEventId])
 }
 
 model RulesetDocument {
