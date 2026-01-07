@@ -11,11 +11,13 @@ model Campaign {
   id          String      @id @default(cuid())
   name        String      @db.VarChar(120)
   system      String      @default("TORMENTA_20") @db.VarChar(40)
+  rulesetId   String      @default("tormenta20") @db.VarChar(50)
   description String?     @db.VarChar(500)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   characters  Character[]
+  combat      Combat?
 }
 
 model Character {
@@ -28,6 +30,7 @@ model Character {
   updatedAt  DateTime  @updatedAt
 
   campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sheet      CharacterSheet?
 
   @@index([campaignId])
 }
@@ -50,6 +53,9 @@ model CharacterSheet {
   id           String   @id @default(cuid())
   characterId  String   @unique
   level        Int      @default(1)
+  className    String?  @db.VarChar(120)
+  ancestry     String?  @db.VarChar(120)
+  deity        String?  @db.VarChar(120)
   for          Int      @default(10)
   des          Int      @default(10)
   con          Int      @default(10)
@@ -65,6 +71,12 @@ model CharacterSheet {
   critRange    Int      @default(20)
   critMultiplier Int     @default(2)
   defenseFinal Int      @default(10)
+  defenseRef   Int      @default(0)
+  defenseFort  Int      @default(0)
+  defenseWill  Int      @default(0)
+  skills       Json?
+  attacks      Json?
+  spells       Json?
   notes        String?
 
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
@@ -116,4 +128,50 @@ model CombatEvent {
   combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
 
   @@index([combatId, ts])
+}
+
+model RulesetDocument {
+  id         String   @id @default(cuid())
+  rulesetId  String   @db.VarChar(50)
+  title      String   @db.VarChar(200)
+  type       String   @db.VarChar(32)
+  filePath   String   @db.VarChar(500)
+  storageKey String   @db.VarChar(500)
+  pages      Int?
+  textIndex  String?
+  createdAt  DateTime @default(now())
+
+  @@index([rulesetId, createdAt])
+  @@index([title])
+}
+
+model SessionSummary {
+  id         String   @id @default(cuid())
+  sessionId  String   @db.VarChar(120)
+  campaignId String?  @db.VarChar(120)
+  summary    String   @db.Text
+  highlights Json?
+  npcs       Json?
+  items      Json?
+  hooks      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([campaignId, createdAt])
+}
+
+model ActionRequest {
+  id         String   @id @default(cuid())
+  campaignId String   @db.VarChar(120)
+  combatId   String?  @db.VarChar(120)
+  roomCode   String?  @db.VarChar(16)
+  actorId    String   @db.VarChar(120)
+  targetId   String   @db.VarChar(120)
+  type       String   @db.VarChar(20)
+  payload    Json
+  status     String   @db.VarChar(16) @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  @@index([campaignId, status, createdAt])
+  @@index([roomCode, status, createdAt])
 }

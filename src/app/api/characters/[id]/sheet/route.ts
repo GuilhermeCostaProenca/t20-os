@@ -11,6 +11,9 @@ async function upsertDefault(characterId: string) {
     create: {
       characterId,
       level: 1,
+      className: null,
+      ancestry: null,
+      deity: null,
       pvCurrent: 10,
       pvMax: 10,
       pmCurrent: 5,
@@ -20,6 +23,12 @@ async function upsertDefault(characterId: string) {
       critRange: 20,
       critMultiplier: 2,
       defenseFinal: 10,
+      defenseRef: 0,
+      defenseFort: 0,
+      defenseWill: 0,
+      skills: [],
+      attacks: [],
+      spells: [],
     },
   });
 }

@@ -2,22 +2,16 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-type SessionVisibility = "master" | "players";
-type SessionEventType = "session" | "timer" | "note" | "roll" | "npc";
+import { normalizeEvent } from "@/lib/events/normalize";
+import { EventPayload } from "@/lib/events/types";
 
-export type SessionEvent = {
+type SessionVisibility = "master" | "players";
+
+export type SessionEvent = EventPayload & {
   id: string;
   timestamp: string;
-  type: SessionEventType;
   message: string;
-  visibility: SessionVisibility;
-  payload?: {
-    roll?: {
-      base: number;
-      mod: number;
-      total: number;
-    };
-  };
+  displayType?: string;
 };
 
 export type SessionState = {
@@ -41,10 +35,12 @@ type SessionContextValue = {
   visibility: SessionVisibility;
   elapsedMs: number;
   startSession: () => void;
+  endSession: () => void;
   toggleTimer: () => void;
   resetTimer: () => void;
   addNote: (message: string) => void;
   addNpcMention: (name: string) => void;
+  addItemMention: (name: string) => void;
   rollD20: (mod: number) => number;
   setVisibility: (v: SessionVisibility) => void;
   clearSession: () => void;
@@ -83,9 +79,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     const saved = reviveState(localStorage.getItem(STORAGE_KEY));
     setState(saved);
-    const savedVisibility = localStorage.getItem(VISIBILITY_KEY) as
-      | SessionVisibility
-      | null;
+    const savedVisibility = localStorage.getItem(VISIBILITY_KEY) as SessionVisibility | null;
     if (savedVisibility === "master" || savedVisibility === "players") {
       setVisibility(savedVisibility);
     }
@@ -113,15 +107,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return state.elapsedMs + (tick - state.lastStartedAt);
   }, [state.elapsedMs, state.running, state.lastStartedAt, tick]);
 
-  function logEvent(event: Omit<SessionEvent, "id" | "timestamp">) {
+  function logEvent(event: Partial<SessionEvent> & { type: string; message?: string }) {
     const now = new Date().toISOString();
+    const normalized = normalizeEvent({
+      ...event,
+      ts: now,
+      visibility: event.visibility,
+      message: event.message,
+    });
     setState((prev) => ({
       ...prev,
       events: [
         {
           id: crypto.randomUUID(),
           timestamp: now,
-          ...event,
+          ...normalized,
+          displayType: event.type,
+          message: event.message ?? normalized.message ?? "",
         },
         ...prev.events,
       ].slice(0, 200),
@@ -133,14 +135,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const startEvent: SessionEvent = {
       id: crypto.randomUUID(),
       timestamp: now,
-      type: "session",
-      message: "Sessão iniciada",
+      type: "SESSION_START",
+      message: "Sessao iniciada",
       visibility,
     };
     const timerEvent: SessionEvent = {
       id: crypto.randomUUID(),
       timestamp: now,
-      type: "timer",
+      type: "NOTE",
       message: "Timer iniciado",
       visibility,
     };
@@ -154,6 +156,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
+  function endSession() {
+    const now = new Date().toISOString();
+    setState((prev) => ({
+      ...prev,
+      running: false,
+      lastStartedAt: null,
+      events: [
+        {
+          id: crypto.randomUUID(),
+          timestamp: now,
+          type: "SESSION_END",
+          message: "Sessao encerrada",
+          visibility,
+        },
+        ...prev.events,
+      ],
+    }));
+  }
+
   function toggleTimer() {
     if (state.running && state.lastStartedAt) {
       const elapsed = state.elapsedMs + (Date.now() - state.lastStartedAt);
@@ -164,7 +185,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         lastStartedAt: null,
       }));
       logEvent({
-        type: "timer",
+        type: "NOTE",
         message: "Timer pausado",
         visibility,
       });
@@ -174,7 +195,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!state.startedAt) {
       startSession();
       logEvent({
-        type: "timer",
+        type: "NOTE",
         message: "Timer iniciado",
         visibility,
       });
@@ -187,7 +208,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       lastStartedAt: Date.now(),
     }));
     logEvent({
-      type: "timer",
+      type: "NOTE",
       message: "Timer retomado",
       visibility,
     });
@@ -201,7 +222,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       lastStartedAt: null,
     }));
     logEvent({
-      type: "timer",
+      type: "NOTE",
       message: "Timer zerado",
       visibility,
     });
@@ -210,7 +231,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   function addNote(message: string) {
     if (!message.trim()) return;
     logEvent({
-      type: "note",
+      type: "NOTE",
       message: message.trim(),
       visibility,
     });
@@ -219,7 +240,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   function addNpcMention(name: string) {
     if (!name.trim()) return;
     logEvent({
-      type: "npc",
+      type: "NPC_MENTION",
+      message: name.trim(),
+      visibility,
+    });
+  }
+
+  function addItemMention(name: string) {
+    if (!name.trim()) return;
+    logEvent({
+      type: "ITEM_MENTION",
       message: name.trim(),
       visibility,
     });
@@ -229,11 +259,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const base = Math.floor(Math.random() * 20) + 1;
     const total = base + mod;
     logEvent({
-      type: "roll",
+      type: "ROLL",
       message: `Rolagem d20 (${base} ${mod >= 0 ? "+" : ""}${mod}) = ${total}`,
       visibility,
       payload: {
-        roll: { base, mod, total },
+        toHit: { d20: base, mod, total },
       },
     });
     return total;
@@ -249,18 +279,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     visibility,
     elapsedMs,
     startSession,
+    endSession,
     toggleTimer,
     resetTimer,
     addNote,
     addNpcMention,
+    addItemMention,
     rollD20,
     setVisibility,
     clearSession,
   };
 
-  return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
-  );
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {

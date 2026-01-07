@@ -1,25 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Swords } from "lucide-react";
+import { AlertTriangle, Loader2, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { rollD20, rollFormula } from "@/lib/t20/dice";
 
-type CharacterLite = {
-  id: string;
-  name: string;
-};
+type CharacterLite = { id: string; name: string };
 
 type Combatant = {
   id: string;
@@ -27,6 +17,8 @@ type Combatant = {
   initiative: number;
   hpCurrent: number;
   hpMax: number;
+  mpCurrent: number;
+  mpMax: number;
   kind?: string;
   refId?: string;
 };
@@ -38,6 +30,7 @@ type CombatState = {
   round: number;
   turnIndex: number;
   combatants: Combatant[];
+  events?: any[];
 };
 
 type Props = {
@@ -45,31 +38,31 @@ type Props = {
   characters: CharacterLite[];
 };
 
-type RollResult = {
+type ActionResult = {
+  attackName?: string;
   toHit?: {
     d20: number;
     mod: number;
     total: number;
-    isNat20: boolean;
-    isNat1: boolean;
+    isNat20?: boolean;
+    isNat1?: boolean;
     isCritThreat?: boolean;
     breakdown?: string;
   };
-  damage?: { total: number; detail: string };
-  message?: string;
+  damage?: { total: number; detail?: string; isCrit?: boolean };
 };
 
 export function CombatPanel({ campaignId, characters }: Props) {
   const [loading, setLoading] = useState(false);
   const [combat, setCombat] = useState<CombatState | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [attacker, setAttacker] = useState<string>("");
-  const [target, setTarget] = useState<string>("");
-  const [toHitMod, setToHitMod] = useState(0);
-  const [damageFormula, setDamageFormula] = useState("1d8+2");
-  const [rollResult, setRollResult] = useState<RollResult | null>(null);
-  const [sheetRoll, setSheetRoll] = useState<RollResult | null>(null);
-  const [overrideDamage, setOverrideDamage] = useState<number | "">("");
+  const [attacker, setAttacker] = useState("");
+  const [target, setTarget] = useState("");
+  const [selectedAttackId, setSelectedAttackId] = useState("");
+  const [sheetData, setSheetData] = useState<Record<string, { attacks: any[] }>>({});
+  const [actionResult, setActionResult] = useState<ActionResult | null>(null);
+  const [overrideInputs, setOverrideInputs] = useState<Record<string, string>>({});
+  const [pendingActions, setPendingActions] = useState<any[]>([]);
 
   const orderedCombatants = useMemo(() => {
     if (!combat?.combatants) return [];
@@ -84,6 +77,46 @@ export function CombatPanel({ campaignId, characters }: Props) {
     refresh();
   }, [campaignId]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (campaignId) refresh();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [campaignId]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (campaignId) loadPending();
+    }, 1000);
+    loadPending();
+    return () => clearInterval(interval);
+  }, [campaignId]);
+
+  useEffect(() => {
+    if (!attacker) {
+      setSelectedAttackId("");
+      return;
+    }
+    const combatant = orderedCombatants.find((c) => c.id === attacker);
+    if (!combatant || combatant.kind !== "CHARACTER" || !combatant.refId) {
+      setSelectedAttackId("");
+      return;
+    }
+    const cached = sheetData[attacker];
+    if (cached) {
+      const list = cached.attacks ?? [];
+      if (list.length) {
+        const stillValid = list.find((a: any) => a.id === selectedAttackId || a.name === selectedAttackId);
+        if (!stillValid) {
+          setSelectedAttackId(list[0].id || list[0].name || "");
+        }
+      } else {
+        setSelectedAttackId("");
+      }
+      return;
+    }
+    void loadSheetData(combatant);
+  }, [attacker, orderedCombatants, sheetData, selectedAttackId]);
+
   async function refresh() {
     if (!campaignId) return;
     try {
@@ -94,9 +127,38 @@ export function CombatPanel({ campaignId, characters }: Props) {
         return;
       }
       setCombat(payload.data);
+      setStatus(null);
     } catch (err) {
       console.error(err);
       setStatus("Erro ao carregar combate");
+    }
+  }
+
+  async function loadPending() {
+    if (!campaignId) return;
+    try {
+      const res = await fetch(`/api/play/action?campaignId=${campaignId}`, { cache: "no-store" });
+      const payload = await res.json();
+      if (!res.ok) return;
+      setPendingActions(payload.data ?? []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function loadSheetData(combatant: Combatant) {
+    if (!combatant.refId) return;
+    try {
+      const res = await fetch(`/api/characters/${combatant.refId}/sheet`, { cache: "no-store" });
+      const payload = await res.json();
+      if (!res.ok) return;
+      const attacks = Array.isArray(payload.data?.attacks) ? payload.data.attacks : [];
+      setSheetData((prev) => ({ ...prev, [combatant.id]: { attacks } }));
+      if (attacks.length) {
+        setSelectedAttackId(attacks[0].id || attacks[0].name || "");
+      }
+    } catch (err) {
+      console.error("loadSheetData", err);
     }
   }
 
@@ -126,7 +188,7 @@ export function CombatPanel({ campaignId, characters }: Props) {
           combatants: characters.map((c) => ({
             name: c.name,
             refId: c.id,
-            kind: "CHARACTER",
+            kind: "CHARACTER" as const,
             des: 10,
             hpMax: 10,
             hpCurrent: 10,
@@ -157,80 +219,66 @@ export function CombatPanel({ campaignId, characters }: Props) {
       await refresh();
     } catch (err) {
       console.error(err);
-      setStatus("Erro ao mudar turno");
+      setStatus("Erro ao alterar turno");
     } finally {
       setLoading(false);
     }
   }
 
-  async function applyDelta(targetId: string, deltaHp: number) {
+  async function applyDelta(targetId: string, deltaHp: number, note?: string) {
     if (!combat) return;
     setLoading(true);
     try {
       await fetch(`/api/campaigns/${campaignId}/combat/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetId, deltaHp }),
+        body: JSON.stringify({ targetId, deltaHp, visibility: "MASTER", note }),
       });
       await refresh();
     } catch (err) {
       console.error(err);
-      setStatus("Erro ao aplicar PV");
+      setStatus("Erro ao aplicar ajuste");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleRollAttack() {
-    if (!attacker || !target) {
-      setStatus("Selecione atacante e alvo.");
-      return;
-    }
-    const toHit = rollD20(toHitMod);
-    const damage = damageFormula ? rollFormula(damageFormula) : null;
-    setRollResult({
-      toHit,
-      damage: damage ?? undefined,
-      message: toHit.isNat20
-        ? "Crítico!"
-        : toHit.isNat1
-        ? "Falha crítica"
-        : "Resolvido",
-    });
-    setStatus(null);
-  }
-
-  async function handleApplyDamage() {
-    if (!rollResult?.damage || !target) return;
-    await applyDelta(target, -Math.abs(rollResult.damage.total));
-  }
-
-  async function handleAttackFromSheet() {
+  async function executeAction() {
     if (!combat?.id || !attacker || !target) {
       setStatus("Selecione atacante e alvo.");
       return;
     }
     setLoading(true);
-    setStatus("Rolando pela ficha...");
+    setStatus("Executando acao...");
     try {
-      const res = await fetch("/api/combat/attack-from-sheet", {
+      const attackerEntity = orderedCombatants.find((c) => c.id === attacker);
+      const res = await fetch(`/api/campaigns/${campaignId}/combat/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          combatId: combat.id,
-          attackerCombatantId: attacker,
-          targetCombatantId: target,
+          actorId: attacker,
+          actorName: attackerEntity?.name ?? "Atacante",
+          kind: "ATTACK",
+          targetId: target,
+          useSheet: true,
+          attackId: selectedAttackId || undefined,
+          visibility: "MASTER",
         }),
       });
       const payload = await res.json();
       if (!res.ok) {
-        throw new Error(payload.error ?? "Falha ao rolar ataque");
+        throw new Error(payload.error ?? "Falha ao executar acao");
       }
-      const toHit = payload.data?.toHit;
-      const damage = payload.data?.damage;
-      setSheetRoll({ toHit, damage, message: payload.data?.attacker });
-      setOverrideDamage(damage?.total ?? "");
-      setStatus(null);
+      setActionResult({
+        attackName:
+          payload.data?.event?.payloadJson?.attackName ||
+          payload.data?.attack?.name ||
+          attackerEntity?.name,
+        toHit: payload.data?.toHit,
+        damage: payload.data?.damage,
+      });
+      setStatus("Dano aplicado automaticamente.");
+      await refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao rolar";
       setStatus(msg);
@@ -239,21 +287,73 @@ export function CombatPanel({ campaignId, characters }: Props) {
     }
   }
 
-  async function handleApplySheetDamage() {
-    if (!target) return;
-    const value = typeof overrideDamage === "number" ? overrideDamage : Number(overrideDamage);
-    if (!value || isNaN(value)) return;
-    await applyDelta(target, -Math.abs(value));
-  }
+  const events = combat?.events ?? [];
 
   return (
     <div className="space-y-4">
+      {pendingActions.length > 0 ? (
+        <Card className="chrome-panel border-white/10 bg-white/5">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Acoes pendentes</CardTitle>
+              <CardDescription>Solicitacoes de jogadores aguardando aprovacao do mestre.</CardDescription>
+            </div>
+            <Badge variant="outline">{pendingActions.length} pendente(s)</Badge>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingActions.map((req) => {
+              const actorName = orderedCombatants.find((c) => c.id === req.actorId)?.name ?? req.actorId;
+              const targetName = orderedCombatants.find((c) => c.id === req.targetId)?.name ?? req.targetId;
+              return (
+                <div
+                  key={req.id}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <p className="font-semibold">
+                      {actorName} -> {targetName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Tipo: {req.type} • Room: {req.roomCode ?? "?"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        await fetch(`/api/play/action/${req.id}/apply`, { method: "POST" });
+                        await loadPending();
+                        await refresh();
+                      }}
+                    >
+                      Aplicar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await fetch(`/api/play/action/${req.id}/apply`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "reject" }),
+                        });
+                        await loadPending();
+                      }}
+                    >
+                      Rejeitar
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="chrome-panel border-white/10 bg-white/5">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Combate</CardTitle>
             <CardDescription>
-              Controle rápido de turno e PV. Mestre pode sobrescrever a qualquer momento.
+              Fluxo completo para o mestre. Ataques aplicam dano automaticamente; overrides sempre possiveis.
             </CardDescription>
           </div>
           <Button onClick={startCombat} disabled={loading || !campaignId}>
@@ -263,15 +363,11 @@ export function CombatPanel({ campaignId, characters }: Props) {
         {combat ? (
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge className="border-primary/25 bg-primary/10 text-primary">
-                Round {combat.round ?? 1}
-              </Badge>
+              <Badge className="border-primary/25 bg-primary/10 text-primary">Round {combat.round ?? 1}</Badge>
               <Badge variant="outline" className="text-muted-foreground">
-                Turno: {currentCombatant?.name ?? "—"}
+                Turno: {currentCombatant?.name ?? "Sem combatente"}
               </Badge>
-              {status ? (
-                <span className="text-sm text-muted-foreground">{status}</span>
-              ) : null}
+              {status ? <span className="text-sm text-muted-foreground">{status}</span> : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={rollInitiative} disabled={loading}>
@@ -280,59 +376,69 @@ export function CombatPanel({ campaignId, characters }: Props) {
               <Button variant="outline" onClick={() => changeTurn("prev")} disabled={loading}>
                 Turno anterior
               </Button>
-              <Button onClick={() => changeTurn("next")} disabled={loading}>
-                Próximo turno
+              <Button variant="outline" onClick={() => changeTurn("next")} disabled={loading}>
+                Proximo turno
               </Button>
             </div>
-
             <Separator className="border-white/10" />
-
-            <div className="grid gap-2">
-              {orderedCombatants.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Sem combatentes ainda. Rolar iniciativa para carregar personagens.
-                </p>
-              ) : (
-                orderedCombatants.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="text-xs">
-                        {c.initiative}
-                      </Badge>
-                      <span className="font-semibold">{c.name}</span>
-                      <span className="text-muted-foreground">
-                        PV {c.hpCurrent}/{c.hpMax}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => applyDelta(c.id, -5)}>
-                        -5 PV
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => applyDelta(c.id, 5)}>
-                        +5 PV
+            <div className="grid gap-3 md:grid-cols-2">
+              {orderedCombatants.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                >
+                  <div className="space-y-1">
+                    <p className="font-semibold">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Init {c.initiative} | PV {c.hpCurrent}/{c.hpMax} | PM {c.mpCurrent ?? 0}/{c.mpMax ?? 0}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={overrideInputs[c.id] ?? ""}
+                        onChange={(e) =>
+                          setOverrideInputs((prev) => ({ ...prev, [c.id]: e.target.value }))
+                        }
+                        placeholder="Delta PV"
+                        className="h-8 w-20 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const delta = Number(overrideInputs[c.id]);
+                          if (isNaN(delta) || delta === 0) return;
+                          applyDelta(c.id, delta, "override manual");
+                          setOverrideInputs((prev) => ({ ...prev, [c.id]: "" }));
+                        }}
+                      >
+                        Override
                       </Button>
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => applyDelta(c.id, -5, "ajuste rapido")}>
+                      -5 PV
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => applyDelta(c.id, 5, "ajuste rapido")}>
+                      +5 PV
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         ) : (
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Inicie o combate para ver round, turno e combatentes.
-            </p>
+          <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4" />
+            Inicie o combate ou aguarde conexao com o servidor.
           </CardContent>
         )}
       </Card>
 
       <Card className="chrome-panel border-white/10 bg-white/5">
         <CardHeader>
-          <CardTitle>Ação simples</CardTitle>
-          <CardDescription>Rolagem de ataque com dano. Mestre confirma aplicação.</CardDescription>
+          <CardTitle>Acao rapida (ataque da ficha)</CardTitle>
+          <CardDescription>Escolha atacante, alvo e ataque cadastrado. Dano aplicado automaticamente.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
@@ -367,103 +473,35 @@ export function CombatPanel({ campaignId, characters }: Props) {
               </select>
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Modificador de ataque</label>
-              <Input
-                type="number"
-                value={toHitMod}
-                onChange={(e) => setToHitMod(Number(e.target.value) || 0)}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-sm text-muted-foreground">Fórmula de dano</label>
-              <Input
-                value={damageFormula}
-                onChange={(e) => setDamageFormula(e.target.value)}
-                placeholder="Ex.: 1d8+4"
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleRollAttack} disabled={!attacker || !target}>
-              Rolar ataque
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleApplyDamage}
-              disabled={!rollResult?.damage || !target}
-            >
-              Aplicar dano
-            </Button>
-          </div>
-          {rollResult ? (
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">
-                  d20 {rollResult.toHit?.total} ({rollResult.toHit?.d20})
-                </Badge>
-                {rollResult.damage ? (
-                  <Badge variant="outline">Dano {rollResult.damage.total}</Badge>
-                ) : null}
-                {rollResult.toHit?.isNat20 ? (
-                  <Badge className="bg-primary/20 text-primary">Crítico</Badge>
-                ) : rollResult.toHit?.isNat1 ? (
-                  <Badge variant="destructive">Falha</Badge>
-                ) : null}
-              </div>
-              {rollResult.damage ? (
-                <p className="text-muted-foreground">Detalhe dano: {rollResult.damage.detail}</p>
-              ) : null}
-              {rollResult.message ? (
-                <p className="text-muted-foreground">{rollResult.message}</p>
-              ) : null}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card className="chrome-panel border-white/10 bg-white/5">
-        <CardHeader>
-          <CardTitle>Ataque (Ficha)</CardTitle>
-          <CardDescription>Usa bônus/dano da ficha do personagem.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Atacante</label>
+              <label className="text-sm text-muted-foreground">Ataque da ficha</label>
               <select
-                value={attacker}
-                onChange={(e) => setAttacker(e.target.value)}
                 className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                value={selectedAttackId}
+                onChange={(e) => setSelectedAttackId(e.target.value)}
+                disabled={!attacker}
               >
-                <option value="">Selecione</option>
-                {orderedCombatants.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {(() => {
+                  const data = sheetData[attacker];
+                  const list = data?.attacks ?? [];
+                  if (!list?.length) return <option value="">Padrao (bonus da ficha)</option>;
+                  return list.map((item: any) => (
+                    <option key={item.id || item.name} value={item.id || item.name}>
+                      {item.name ?? "Ataque"}
+                    </option>
+                  ));
+                })()}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Alvo</label>
-              <select
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-              >
-                <option value="">Selecione</option>
-                {orderedCombatants.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <label className="text-sm text-muted-foreground">Magia / Pericia</label>
+              <Input disabled value="Em breve - use ataque" className="h-10 bg-black/20 text-sm" />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={handleAttackFromSheet}
+              onClick={executeAction}
               disabled={
                 loading ||
                 !attacker ||
@@ -471,47 +509,101 @@ export function CombatPanel({ campaignId, characters }: Props) {
                 orderedCombatants.find((c) => c.id === attacker)?.kind !== "CHARACTER"
               }
             >
-              Atacar (Ficha)
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleApplySheetDamage}
-              disabled={!sheetRoll || !target || overrideDamage === ""}
-            >
-              Aplicar dano
+              Executar ataque
             </Button>
           </div>
-          {sheetRoll ? (
+          {actionResult ? (
             <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">
-                  d20 {sheetRoll.toHit?.total} ({sheetRoll.toHit?.d20})
+                  d20 {actionResult.toHit?.total} ({actionResult.toHit?.d20})
                 </Badge>
-                {sheetRoll.toHit?.isCritThreat ? (
-                  <Badge className="bg-primary/20 text-primary">Ameaça</Badge>
+                {actionResult.toHit?.isCritThreat ? (
+                  <Badge className="bg-primary/20 text-primary">Ameaca</Badge>
                 ) : null}
-                {sheetRoll.toHit?.isNat20 ? (
-                  <Badge className="bg-primary/20 text-primary">Crítico</Badge>
-                ) : sheetRoll.toHit?.isNat1 ? (
+                {actionResult.toHit?.isNat20 ? (
+                  <Badge className="bg-primary/20 text-primary">Critico</Badge>
+                ) : actionResult.toHit?.isNat1 ? (
                   <Badge variant="destructive">Falha</Badge>
                 ) : null}
-                {sheetRoll.damage ? (
-                  <Badge variant="outline">Dano {sheetRoll.damage.total}</Badge>
+                {actionResult.damage ? (
+                  <Badge variant="outline">
+                    Dano {actionResult.damage.total}
+                    {actionResult.damage.isCrit ? " (crit)" : ""}
+                  </Badge>
                 ) : null}
               </div>
-              {sheetRoll.toHit?.breakdown ? (
-                <p className="text-muted-foreground">Ataque: {sheetRoll.toHit.breakdown}</p>
+              {actionResult.attackName ? (
+                <p className="text-muted-foreground">Ataque: {actionResult.attackName}</p>
               ) : null}
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Dano (edite se quiser)</label>
-                <Input
-                  value={overrideDamage}
-                  onChange={(e) => setOverrideDamage(e.target.value === "" ? "" : Number(e.target.value))}
-                  placeholder="Dano"
-                />
-              </div>
+              {actionResult.toHit?.breakdown ? (
+                <p className="text-muted-foreground text-xs">Ataque: {actionResult.toHit.breakdown}</p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">Dano ja aplicado no alvo.</p>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="chrome-panel border-white/10 bg-white/5">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Log de eventos</CardTitle>
+            <CardDescription>Breakdown de rolagens e efeitos aplicados.</CardDescription>
+          </div>
+          <Badge variant="outline" className="gap-1 text-xs">
+            <ScrollText className="h-3 w-3" />
+            {events.length} eventos
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum evento ainda.</p>
+          ) : (
+            events.map((ev: any) => {
+              const payload = ev.payloadJson ?? {};
+              return (
+                <div
+                  key={ev.id}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm leading-tight"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="capitalize">
+                        {ev.type.toLowerCase()}
+                      </Badge>
+                      <span className="font-semibold">{payload.actorName ?? ev.actorName}</span>
+                      {payload.targetName || payload.targetId ? (
+                        <span className="text-muted-foreground">-> {payload.targetName ?? payload.targetId}</span>
+                      ) : null}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(ev.ts ?? ev.createdAt ?? Date.now()).toLocaleTimeString("pt-BR")}
+                    </span>
+                  </div>
+                  {payload.toHit ? (
+                    <p className="text-xs text-muted-foreground">
+                      d20 {payload.toHit.total} ({payload.toHit.d20}) | mod {payload.toHit.mod}
+                      {payload.toHit.isCritThreat ? " | ameaca" : ""}{" "}
+                      {payload.toHit.isNat20 ? " | critico" : payload.toHit.isNat1 ? " | falha" : ""}
+                    </p>
+                  ) : null}
+                  {payload.damage ? (
+                    <p className="text-xs text-muted-foreground">
+                      Dano {payload.damage.total} {payload.damage.detail ? `(${payload.damage.detail})` : ""}
+                    </p>
+                  ) : null}
+                  {payload.costMp ? (
+                    <p className="text-xs text-muted-foreground">Custo PM: {payload.costMp}</p>
+                  ) : null}
+                  {payload.hpAfter !== undefined ? (
+                    <p className="text-xs text-muted-foreground">HP alvo: {payload.hpAfter}</p>
+                  ) : null}
+                  {payload.note ? <p className="text-xs text-muted-foreground">Nota: {payload.note}</p> : null}
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
     </div>

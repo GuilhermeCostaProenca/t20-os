@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatAttackFromSheetSchema } from "@/lib/validators";
-import { computeAttackRoll, computeDamage } from "@/lib/t20/combat";
+import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
 export async function POST(req: Request) {
@@ -10,7 +10,10 @@ export async function POST(req: Request) {
 
     const combat = await prisma.combat.findUnique({
       where: { id: parsed.combatId },
-      include: { combatants: true },
+      include: {
+        combatants: true,
+        campaign: { select: { rulesetId: true } },
+      },
     });
     if (!combat) {
       return Response.json({ error: "Combate não encontrado" }, { status: 404 });
@@ -33,34 +36,19 @@ export async function POST(req: Request) {
       where: { characterId: attacker.refId },
     });
 
-    const fallback = {
-      for: 10,
-      attackBonus: 0,
-      damageFormula: "1d6",
-      critRange: 20,
-      critMultiplier: 2,
-    };
+    const ruleset = getRuleset(combat.campaign?.rulesetId);
+    const sheetData = sheet ?? {};
+    const attacks = Array.isArray((sheetData as any)?.attacks) ? (sheetData as any).attacks : [];
+    const selectedAttack =
+      (parsed.attackId && attacks.find((a: any) => a.id === parsed.attackId || a.name === parsed.attackId)) ||
+      attacks[0];
 
-    const data = sheet ?? fallback;
-
-    const toHit = computeAttackRoll({
-      for: data.for ?? 10,
-      attackBonus: data.attackBonus ?? 0,
-      damageFormula: data.damageFormula ?? "1d6",
-      critRange: data.critRange ?? 20,
-      critMultiplier: data.critMultiplier ?? 2,
+    const toHit = ruleset.computeAttack({ sheet: sheetData, attack: selectedAttack });
+    const damage = ruleset.computeDamage({
+      sheet: sheetData,
+      attack: selectedAttack,
+      isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
     });
-
-    const damage = computeDamage(
-      {
-        for: data.for ?? 10,
-        attackBonus: data.attackBonus ?? 0,
-        damageFormula: data.damageFormula ?? "1d6",
-        critRange: data.critRange ?? 20,
-        critMultiplier: data.critMultiplier ?? 2,
-      },
-      toHit.isCritThreat && toHit.isNat20
-    );
 
     await prisma.combatEvent.create({
       data: {
@@ -73,6 +61,8 @@ export async function POST(req: Request) {
           targetId: target.id,
           toHit,
           damage,
+          attackId: selectedAttack?.id,
+          attackName: selectedAttack?.name,
           source: "sheet",
         },
       },
@@ -84,6 +74,7 @@ export async function POST(req: Request) {
         damage,
         attacker: attacker.name,
         target: target.name,
+        attack: selectedAttack,
       },
     });
   } catch (error) {

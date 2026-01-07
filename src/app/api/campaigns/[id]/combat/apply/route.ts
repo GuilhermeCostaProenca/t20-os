@@ -40,12 +40,16 @@ export async function POST(req: Request, { params }: Context) {
       data: {
         combatId: combat.id,
         actorName: target.name,
-        type: parsed.deltaHp && parsed.deltaHp < 0 ? "DAMAGE" : parsed.deltaHp && parsed.deltaHp > 0 ? "HEAL" : "NOTE",
+        type: "OVERRIDE",
         visibility: parsed.visibility,
         payloadJson: {
           targetId: target.id,
           deltaHp: parsed.deltaHp ?? 0,
           deltaMp: parsed.deltaMp ?? 0,
+          hpBefore: target.hpCurrent,
+          hpAfter: newHp,
+          mpBefore: target.mpCurrent,
+          mpAfter: newMp,
           note: parsed.note,
         },
       },

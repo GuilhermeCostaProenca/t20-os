@@ -22,11 +22,13 @@ export async function POST(req: Request) {
   try {
     const payload = await req.json();
     const parsed = CampaignCreateSchema.parse(payload);
+    const rulesetId = parsed.rulesetId ?? "tormenta20";
 
     const campaign = await prisma.campaign.create({
       data: {
         name: parsed.name,
         description: parsed.description,
+        rulesetId,
       },
     });
 

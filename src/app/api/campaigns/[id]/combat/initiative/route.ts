@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { CombatInitiativeSchema } from "@/lib/validators";
-import { computeInitiative, applyDelta } from "@/lib/t20/combat";
+import { rollD20 } from "@/lib/t20/dice";
+import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
 type Context = { params: { id: string } };
@@ -12,7 +13,10 @@ export async function POST(req: Request, { params }: Context) {
 
     const combat = await prisma.combat.findUnique({
       where: { campaignId: params.id },
-      include: { combatants: true },
+      include: {
+        combatants: true,
+        campaign: { select: { rulesetId: true } },
+      },
     });
     if (!combat) {
       return Response.json({ error: "Combate não encontrado" }, { status: 404 });
@@ -21,9 +25,12 @@ export async function POST(req: Request, { params }: Context) {
     // Wipe existing combatants for MVP
     await prisma.combatant.deleteMany({ where: { combatId: combat.id } });
 
+    const ruleset = getRuleset(combat.campaign?.rulesetId);
+
     const created = [];
     for (const c of parsed.combatants) {
-      const init = computeInitiative(c.des ?? 10);
+      const mod = ruleset.getAbilityMod((c as any)?.des ?? 10);
+      const init = rollD20(mod);
       created.push(
         await prisma.combatant.create({
           data: {
