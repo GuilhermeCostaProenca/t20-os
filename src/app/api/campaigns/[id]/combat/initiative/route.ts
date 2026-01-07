@@ -22,8 +22,10 @@ export async function POST(req: Request, { params }: Context) {
       return Response.json({ error: "Combate não encontrado" }, { status: 404 });
     }
 
-    // Wipe existing combatants for MVP
-    await prisma.combatant.deleteMany({ where: { combatId: combat.id } });
+    const existingExtras = combat.combatants.filter((c) => c.kind !== "CHARACTER");
+    await prisma.combatant.deleteMany({
+      where: { combatId: combat.id, kind: "CHARACTER" },
+    });
 
     const ruleset = getRuleset(combat.campaign?.rulesetId);
 
@@ -48,7 +50,8 @@ export async function POST(req: Request, { params }: Context) {
       );
     }
 
-    const ordered = created.sort((a, b) => b.initiative - a.initiative);
+    const combined = [...existingExtras, ...created];
+    const ordered = combined.sort((a, b) => b.initiative - a.initiative);
     return Response.json({ data: ordered });
   } catch (error) {
     if (error instanceof ZodError) {

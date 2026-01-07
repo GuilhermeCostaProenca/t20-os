@@ -44,16 +44,32 @@ export async function POST(req: Request, { params }: Context) {
     let skillUsed: any = null;
 
     if (parsed.kind === "ATTACK") {
-      attackUsed =
-        (parsed.attackId && attacks.find((a: any) => a.id === parsed.attackId || a.name === parsed.attackId)) ||
-        attacks[0];
-      if (parsed.useSheet !== false && attackUsed) {
-        toHit = ruleset.computeAttack({ sheet: sheet ?? {}, attack: attackUsed });
-        damage = ruleset.computeDamage({
-          sheet: sheet ?? {},
-          attack: attackUsed,
-          isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
-        });
+      const isCharacter = attacker?.kind === "CHARACTER";
+      if (isCharacter) {
+        attackUsed =
+          (parsed.attackId && attacks.find((a: any) => a.id === parsed.attackId || a.name === parsed.attackId)) ||
+          attacks[0];
+        if (parsed.useSheet !== false && attackUsed) {
+          toHit = ruleset.computeAttack({ sheet: sheet ?? {}, attack: attackUsed });
+          damage = ruleset.computeDamage({
+            sheet: sheet ?? {},
+            attack: attackUsed,
+            isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
+          });
+        } else {
+          toHit = rollD20(parsed.toHitMod ?? 0);
+          damage = parsed.damageFormula ? rollFormula(parsed.damageFormula) : null;
+        }
+      } else if (attacker) {
+        const mod = attacker.attackBonus ?? 0;
+        const roll = rollD20(mod);
+        toHit = {
+          ...roll,
+          isCritThreat: roll.d20 === 20,
+          breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
+        };
+        const formula = attacker.damageFormula ?? parsed.damageFormula ?? "1d6";
+        damage = rollFormula(formula);
       } else {
         toHit = rollD20(parsed.toHitMod ?? 0);
         damage = parsed.damageFormula ? rollFormula(parsed.damageFormula) : null;

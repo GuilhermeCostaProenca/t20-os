@@ -137,6 +137,21 @@ export const CombatInitiativeSchema = z.object({
   ),
 });
 
+export const CombatantCreateSchema = z.object({
+  name: z.string().trim().min(1),
+  kind: z.enum(["NPC", "MONSTER"]).default("NPC"),
+  hpMax: z.coerce.number().int().min(1),
+  hpCurrent: z.coerce.number().int().min(0).optional(),
+  defenseFinal: z.coerce.number().int().min(0).default(10),
+  attackBonus: z.coerce.number().int().optional(),
+  damageFormula: z
+    .string()
+    .trim()
+    .max(50)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+});
+
 export const CombatTurnSchema = z.object({
   direction: z.enum(["next", "prev"]).default("next"),
 });

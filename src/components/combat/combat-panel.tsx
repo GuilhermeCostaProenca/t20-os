@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, ScrollText } from "lucide-react";
+import { AlertTriangle, Loader2, Plus, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
@@ -19,6 +27,9 @@ type Combatant = {
   hpMax: number;
   mpCurrent: number;
   mpMax: number;
+  defenseFinal?: number;
+  attackBonus?: number;
+  damageFormula?: string;
   kind?: string;
   refId?: string;
 };
@@ -63,6 +74,15 @@ export function CombatPanel({ campaignId, characters }: Props) {
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const [overrideInputs, setOverrideInputs] = useState<Record<string, string>>({});
   const [pendingActions, setPendingActions] = useState<any[]>([]);
+  const [npcDialogOpen, setNpcDialogOpen] = useState(false);
+  const [npcForm, setNpcForm] = useState({
+    name: "",
+    hpMax: 10,
+    defenseFinal: 10,
+    damageFormula: "1d6",
+  });
+  const [npcError, setNpcError] = useState<string | null>(null);
+  const [npcSubmitting, setNpcSubmitting] = useState(false);
 
   const orderedCombatants = useMemo(() => {
     if (!combat?.combatants) return [];
@@ -71,6 +91,8 @@ export function CombatPanel({ campaignId, characters }: Props) {
 
   const currentCombatant =
     orderedCombatants[(combat?.turnIndex ?? 0) % (orderedCombatants.length || 1)];
+  const attackerEntity = orderedCombatants.find((c) => c.id === attacker);
+  const attackerIsCharacter = attackerEntity?.kind === "CHARACTER";
 
   useEffect(() => {
     if (!campaignId) return;
@@ -176,6 +198,41 @@ export function CombatPanel({ campaignId, characters }: Props) {
     }
   }
 
+  async function createNpc() {
+    if (!campaignId) return;
+    if (!npcForm.name.trim()) {
+      setNpcError("Defina um nome para o inimigo.");
+      return;
+    }
+    setNpcSubmitting(true);
+    setNpcError(null);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/combat/combatants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: npcForm.name.trim(),
+          kind: "NPC",
+          hpMax: npcForm.hpMax,
+          defenseFinal: npcForm.defenseFinal,
+          damageFormula: npcForm.damageFormula,
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Falha ao criar inimigo");
+      }
+      setNpcDialogOpen(false);
+      setNpcForm({ name: "", hpMax: 10, defenseFinal: 10, damageFormula: "1d6" });
+      await refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao criar inimigo";
+      setNpcError(msg);
+    } finally {
+      setNpcSubmitting(false);
+    }
+  }
+
   async function rollInitiative() {
     if (!combat) return;
     setLoading(true);
@@ -251,7 +308,7 @@ export function CombatPanel({ campaignId, characters }: Props) {
     setLoading(true);
     setStatus("Executando acao...");
     try {
-      const attackerEntity = orderedCombatants.find((c) => c.id === attacker);
+      const useSheet = attackerIsCharacter;
       const res = await fetch(`/api/campaigns/${campaignId}/combat/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,8 +317,8 @@ export function CombatPanel({ campaignId, characters }: Props) {
           actorName: attackerEntity?.name ?? "Atacante",
           kind: "ATTACK",
           targetId: target,
-          useSheet: true,
-          attackId: selectedAttackId || undefined,
+          useSheet,
+          attackId: useSheet ? selectedAttackId || undefined : undefined,
           visibility: "MASTER",
         }),
       });
@@ -356,9 +413,86 @@ export function CombatPanel({ campaignId, characters }: Props) {
               Fluxo completo para o mestre. Ataques aplicam dano automaticamente; overrides sempre possiveis.
             </CardDescription>
           </div>
-          <Button onClick={startCombat} disabled={loading || !campaignId}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar combate"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Dialog open={npcDialogOpen} onOpenChange={setNpcDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" disabled={loading || !campaignId}>
+                  <Plus className="h-4 w-4" />
+                  Adicionar inimigo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="chrome-panel border-white/10 bg-card/90 backdrop-blur">
+                <DialogHeader>
+                  <DialogTitle>Novo inimigo</DialogTitle>
+                  <DialogDescription>Defina nome, PV, defesa e dano base.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-sm text-muted-foreground">Nome</label>
+                    <Input
+                      value={npcForm.name}
+                      onChange={(e) => setNpcForm((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Esqueleto"
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">PV Max</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={npcForm.hpMax}
+                        onChange={(e) =>
+                          setNpcForm((prev) => ({ ...prev, hpMax: Number(e.target.value) || 1 }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">Defesa</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={npcForm.defenseFinal}
+                        onChange={(e) =>
+                          setNpcForm((prev) => ({
+                            ...prev,
+                            defenseFinal: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm text-muted-foreground">Dano base</label>
+                    <Input
+                      value={npcForm.damageFormula}
+                      onChange={(e) =>
+                        setNpcForm((prev) => ({ ...prev, damageFormula: e.target.value }))
+                      }
+                      placeholder="1d6+2"
+                    />
+                  </div>
+                  {npcError ? <p className="text-sm text-destructive">{npcError}</p> : null}
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => setNpcDialogOpen(false)}
+                      disabled={npcSubmitting}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={createNpc} disabled={npcSubmitting}>
+                      {npcSubmitting ? "Criando..." : "Adicionar"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button onClick={startCombat} disabled={loading || !campaignId}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar combate"}
+            </Button>
+          </div>
         </CardHeader>
         {combat ? (
           <CardContent className="space-y-3">
@@ -390,7 +524,8 @@ export function CombatPanel({ campaignId, characters }: Props) {
                   <div className="space-y-1">
                     <p className="font-semibold">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Init {c.initiative} | PV {c.hpCurrent}/{c.hpMax} | PM {c.mpCurrent ?? 0}/{c.mpMax ?? 0}
+                      Init {c.initiative} | PV {c.hpCurrent}/{c.hpMax} | PM {c.mpCurrent ?? 0}/{c.mpMax ?? 0} | Def{" "}
+                      {c.defenseFinal ?? 0} | Dano {c.damageFormula ?? "1d6"}
                     </p>
                     <div className="flex items-center gap-2">
                       <Input
@@ -480,9 +615,12 @@ export function CombatPanel({ campaignId, characters }: Props) {
                 className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
                 value={selectedAttackId}
                 onChange={(e) => setSelectedAttackId(e.target.value)}
-                disabled={!attacker}
+                disabled={!attacker || !attackerIsCharacter}
               >
                 {(() => {
+                  if (!attackerIsCharacter) {
+                    return <option value="">Ataque base do inimigo</option>;
+                  }
                   const data = sheetData[attacker];
                   const list = data?.attacks ?? [];
                   if (!list?.length) return <option value="">Padrao (bonus da ficha)</option>;
@@ -493,6 +631,11 @@ export function CombatPanel({ campaignId, characters }: Props) {
                   ));
                 })()}
               </select>
+              {!attackerIsCharacter && attackerEntity ? (
+                <p className="text-xs text-muted-foreground">
+                  Dano base: {attackerEntity.damageFormula ?? "1d6"}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Magia / Pericia</label>
@@ -505,8 +648,7 @@ export function CombatPanel({ campaignId, characters }: Props) {
               disabled={
                 loading ||
                 !attacker ||
-                !target ||
-                orderedCombatants.find((c) => c.id === attacker)?.kind !== "CHARACTER"
+                !target
               }
             >
               Executar ataque
