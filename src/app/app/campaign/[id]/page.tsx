@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowRight,
@@ -361,31 +362,32 @@ export default function CampaignPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {sortedCharacters.map((character) => (
-                <Card
+                <Link
                   key={character.id}
-                  className="chrome-panel rounded-2xl border-white/10 bg-white/5"
+                  href={`/app/personagens/${character.id}`}
+                  className="block"
                 >
-                  <CardHeader className="flex flex-row items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <CardTitle className="text-lg">{character.name}</CardTitle>
-                      <CardDescription>
-                        {character.role || "Sem papel definido"}
-                      </CardDescription>
-                    </div>
-                    <Badge className="border-primary/30 bg-primary/10 text-primary">
-                      Nível {character.level}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      Atualizado{" "}
-                      {new Date(character.updatedAt).toLocaleDateString(
-                        "pt-BR"
-                      )}
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-primary" />
-                  </CardContent>
-                </Card>
+                  <Card className="chrome-panel group rounded-2xl border-white/10 bg-white/5 transition duration-150 hover:-translate-y-1 hover:border-primary/25">
+                    <CardHeader className="flex flex-row items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <CardTitle className="text-lg">{character.name}</CardTitle>
+                        <CardDescription>
+                          {character.role || "Sem papel definido"}
+                        </CardDescription>
+                      </div>
+                      <Badge className="border-primary/30 bg-primary/10 text-primary">
+                        N?vel {character.level}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>
+                        Atualizado{" "}
+                        {new Date(character.updatedAt).toLocaleDateString("pt-BR")}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
