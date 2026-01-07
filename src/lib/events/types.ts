@@ -5,6 +5,8 @@ export type EventType =
   | "DAMAGE"
   | "SPELL"
   | "SKILL"
+  | "CONDITION_APPLIED"
+  | "CONDITION_REMOVED"
   | "NOTE"
   | "NPC_MENTION"
   | "ITEM_MENTION"

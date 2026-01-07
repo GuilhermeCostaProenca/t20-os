@@ -10,6 +10,8 @@ function normalizeType(raw?: string): EventType {
     case "DAMAGE":
     case "SPELL":
     case "SKILL":
+    case "CONDITION_APPLIED":
+    case "CONDITION_REMOVED":
     case "NOTE":
     case "NPC_MENTION":
     case "ITEM_MENTION":

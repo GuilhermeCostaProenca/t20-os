@@ -206,6 +206,37 @@ export const CombatAttackFromSheetSchema = z.object({
   attackId: z.string().trim().optional(),
 });
 
+export const CombatConditionApplySchema = z
+  .object({
+    targetCombatantId: z.string().trim(),
+    conditionId: z.string().trim().optional(),
+    conditionKey: z.string().trim().optional(),
+    expiresAtTurn: z.number().int().optional(),
+    visibility: z.enum(["MASTER", "PLAYERS"]).default("MASTER").optional(),
+  })
+  .refine((data) => data.conditionId || data.conditionKey, {
+    message: "ConditionId ou conditionKey e obrigatorio",
+    path: ["conditionId"],
+  });
+
+export const CombatConditionRemoveSchema = z
+  .object({
+    appliedConditionId: z.string().trim().optional(),
+    targetCombatantId: z.string().trim().optional(),
+    conditionId: z.string().trim().optional(),
+    conditionKey: z.string().trim().optional(),
+    visibility: z.enum(["MASTER", "PLAYERS"]).default("MASTER").optional(),
+  })
+  .refine(
+    (data) =>
+      data.appliedConditionId ||
+      (data.targetCombatantId && (data.conditionId || data.conditionKey)),
+    {
+      message: "Informe appliedConditionId ou alvo + condicao",
+      path: ["appliedConditionId"],
+    }
+  );
+
 export const ActionRequestCreateSchema = z.object({
   campaignId: z.string().trim(),
   combatId: z.string().trim().optional(),
