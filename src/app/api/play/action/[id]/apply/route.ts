@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { rollD20, rollFormula } from "@/lib/t20/dice";
 import { clamp } from "@/lib/t20/modifiers";
 import { getRuleset } from "@/rulesets";
 import { ActionRequestApplySchema } from "@/lib/validators";
@@ -59,6 +58,7 @@ export async function POST(req: Request, { params }: Context) {
       attack: attackUsed,
       isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
     });
+    const costMp = Number((request.payload as any)?.costMp ?? 0) || 0;
 
     const targetBefore = target.hpCurrent;
     const newHp = clamp(target.hpCurrent + -Math.abs(damage.total ?? 0), 0, target.hpMax);
@@ -66,6 +66,16 @@ export async function POST(req: Request, { params }: Context) {
       where: { id: target.id },
       data: { hpCurrent: newHp },
     });
+
+    const attackerBefore = attacker.mpCurrent;
+    let updatedAttacker = attacker;
+    if (costMp && attacker) {
+      const newMp = clamp(attacker.mpCurrent - Math.abs(costMp), 0, attacker.mpMax);
+      updatedAttacker = await prisma.combatant.update({
+        where: { id: attacker.id },
+        data: { mpCurrent: newMp },
+      });
+    }
 
     const event = await prisma.combatEvent.create({
       data: {
@@ -82,9 +92,12 @@ export async function POST(req: Request, { params }: Context) {
           damage,
           attackId: attackUsed?.id,
           attackName: attackUsed?.name,
+          costMp,
           deltaHp: -Math.abs(damage.total ?? 0),
           hpBefore: targetBefore,
           hpAfter: updatedTarget.hpCurrent,
+          mpBefore: attackerBefore,
+          mpAfter: updatedAttacker?.mpCurrent,
           meta: { campaignId: combat.campaignId, combatId: combat.id },
         },
       },

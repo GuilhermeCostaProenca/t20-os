@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 type Reveal = {
@@ -46,9 +45,9 @@ export default function PlayRoomPage() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [combatId, setCombatId] = useState<string | null>(null);
   const [combatants, setCombatants] = useState<any[]>([]);
-  const [actor, setActor] = useState("");
+  const [selectedCharacterId, setSelectedCharacterId] = useState("");
+  const [attacks, setAttacks] = useState<any[]>([]);
   const [target, setTarget] = useState("");
-  const [actionKind, setActionKind] = useState<"ATTACK" | "SPELL" | "SKILL">("ATTACK");
   const [attackId, setAttackId] = useState("");
   const [actionStatus, setActionStatus] = useState<string | null>(null);
 
@@ -96,6 +95,20 @@ export default function PlayRoomPage() {
     return "";
   }, [reveal]);
 
+  const actorCombatant = useMemo(() => {
+    if (!selectedCharacterId) return null;
+    return combatants.find((combatant) => combatant.refId === selectedCharacterId) ?? null;
+  }, [combatants, selectedCharacterId]);
+
+  useEffect(() => {
+    if (!selectedCharacterId) {
+      setAttacks([]);
+      setAttackId("");
+      return;
+    }
+    loadCharacterSheet(selectedCharacterId);
+  }, [selectedCharacterId]);
+
   async function ackReveal() {
     if (!reveal) return;
     try {
@@ -108,6 +121,27 @@ export default function PlayRoomPage() {
       console.error(err);
     } finally {
       setOpen(false);
+    }
+  }
+
+  async function loadCharacterSheet(id: string) {
+    try {
+      const res = await fetch(`/api/characters/${id}/sheet`, { cache: "no-store" });
+      const payload = await res.json();
+      if (!res.ok) {
+        setActionStatus(payload.error ?? "Erro ao carregar ficha");
+        return;
+      }
+      const list = Array.isArray(payload.data?.attacks) ? payload.data.attacks : [];
+      setAttacks(list);
+      if (list.length) {
+        setAttackId(list[0].id || list[0].name || "");
+      } else {
+        setAttackId("");
+      }
+    } catch (err) {
+      console.error(err);
+      setActionStatus("Erro ao carregar ficha");
     }
   }
 
@@ -172,8 +206,9 @@ export default function PlayRoomPage() {
   }
 
   async function executeAction() {
-    if (!campaignId || !actor || !target) {
-      setActionStatus("Selecione personagem e alvo");
+    const actorId = actorCombatant?.id;
+    if (!campaignId || !actorId || !target) {
+      setActionStatus("Selecione personagem, alvo e combate valido");
       return;
     }
     setActionStatus("Enviando acao...");
@@ -183,11 +218,11 @@ export default function PlayRoomPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roomCode,
-          actorId: actor,
+          actorId,
           targetId: target,
           campaignId,
           combatId: combatId ?? undefined,
-          type: actionKind,
+          type: "ATTACK",
           payload: { attackId: attackId || undefined },
         }),
       });
@@ -284,56 +319,77 @@ export default function PlayRoomPage() {
             <CardDescription>Atacar / Magia / Pericia via ficha.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => loadCombatants()} disabled={!campaignId}>
                 Atualizar combate
               </Button>
-              <select
-                className="h-10 flex-1 rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                value={actionKind}
-                onChange={(e) => setActionKind(e.target.value as any)}
-              >
-                <option value="ATTACK">Ataque</option>
-                <option value="SPELL" disabled>
-                  Magia (em breve)
-                </option>
-                <option value="SKILL" disabled>
-                  Pericia (em breve)
-                </option>
-              </select>
+              {actorCombatant ? (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Ator: {actorCombatant.name}
+                </Badge>
+              ) : null}
             </div>
             <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Seu personagem</label>
+                <select
+                  className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                  value={selectedCharacterId}
+                  onChange={(e) => setSelectedCharacterId(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {characters.map((character) => (
+                    <option key={character.id} value={character.id}>
+                      {character.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedCharacterId && !actorCombatant ? (
+                  <p className="text-xs text-muted-foreground">
+                    Seu personagem ainda nao entrou no combate.
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Alvo</label>
+                <select
+                  className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {combatants.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">Ataque da ficha</label>
               <select
-                className="h-10 rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                value={actor}
-                onChange={(e) => setActor(e.target.value)}
+                className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                value={attackId}
+                onChange={(e) => setAttackId(e.target.value)}
+                disabled={!selectedCharacterId}
               >
-                <option value="">Ator</option>
-                {combatants.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              >
-                <option value="">Alvo</option>
-                {combatants.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {attacks.length ? (
+                  attacks.map((attack) => (
+                    <option key={attack.id || attack.name} value={attack.id || attack.name}>
+                      {attack.name ?? "Ataque"}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Ataque basico</option>
+                )}
               </select>
             </div>
-            <Input
-              placeholder="Attack ID (opcional, da ficha)"
-              value={attackId}
-              onChange={(e) => setAttackId(e.target.value)}
-            />
-            <Button className="w-full" onClick={executeAction} disabled={!actor || !target || !campaignId}>
+            <Button
+              className="w-full"
+              onClick={executeAction}
+              disabled={!actorCombatant || !target || !campaignId}
+            >
               Enviar acao
             </Button>
             {actionStatus ? <p className="text-xs text-muted-foreground">{actionStatus}</p> : null}
