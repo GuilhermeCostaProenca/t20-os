@@ -7,10 +7,55 @@ import { ZodError } from "zod";
 
 type Context = { params: { id: string } };
 
+type ActionType = "ATTACK" | "SPELL" | "SKILL";
+
+type ConditionRef = {
+  id: string;
+  key: string;
+  name: string;
+};
+
+function resolveActionType(parsed: any): ActionType {
+  return (parsed.kind ?? parsed.type ?? "ATTACK") as ActionType;
+}
+
+async function loadAppliedConditions(combatId: string, combatantId?: string | null) {
+  if (!combatantId) return [];
+  return prisma.appliedCondition.findMany({
+    where: { combatId, targetCombatantId: combatantId },
+    include: { condition: true },
+  });
+}
+
+async function resolveConditions(
+  rulesetId: string,
+  conditionIds: string[],
+  conditionKeys: string[]
+): Promise<ConditionRef[]> {
+  const filters: any[] = [];
+  if (conditionIds.length) {
+    filters.push({ id: { in: conditionIds } });
+  }
+  if (conditionKeys.length) {
+    filters.push({ rulesetId, key: { in: conditionKeys } });
+  }
+  if (!filters.length) return [];
+  const results = await prisma.condition.findMany({ where: { OR: filters } });
+  const seen = new Set<string>();
+  return results
+    .filter((cond) => {
+      if (seen.has(cond.id)) return false;
+      seen.add(cond.id);
+      return true;
+    })
+    .map((cond) => ({ id: cond.id, key: cond.key, name: cond.name }));
+}
+
 export async function POST(req: Request, { params }: Context) {
   try {
     const payload = await req.json();
     const parsed = CombatActionSchema.parse(payload);
+    const actionType = resolveActionType(parsed);
 
     const combat = await prisma.combat.findUnique({
       where: { campaignId: params.id },
@@ -27,8 +72,19 @@ export async function POST(req: Request, { params }: Context) {
     const attacker = combat.combatants.find((c) => c.id === parsed.actorId);
     const target = combat.combatants.find((c) => c.id === parsed.targetId);
 
+    if (!attacker || !target) {
+      return Response.json({ error: "Ator ou alvo nao encontrado" }, { status: 404 });
+    }
+
+    const [actorConditions, targetConditions] = await Promise.all([
+      loadAppliedConditions(combat.id, attacker.id),
+      loadAppliedConditions(combat.id, target.id),
+    ]);
+
+    const conditionContext = { actorConditions, targetConditions };
+
     const sheet =
-      attacker?.kind === "CHARACTER" && attacker.refId
+      attacker.kind === "CHARACTER" && attacker.refId
         ? await prisma.characterSheet.findUnique({ where: { characterId: attacker.refId } })
         : null;
 
@@ -38,80 +94,133 @@ export async function POST(req: Request, { params }: Context) {
 
     let toHit: any = null;
     let damage: any = null;
-    let costMp = parsed.costMp ?? 0;
+    let costMp = 0;
     let attackUsed: any = null;
     let spellUsed: any = null;
     let skillUsed: any = null;
+    let effectsApplied: Array<{ conditionKey?: string; note?: string }> = [];
 
-    if (parsed.kind === "ATTACK") {
-      const isCharacter = attacker?.kind === "CHARACTER";
+    if (actionType === "ATTACK") {
+      const isCharacter = attacker.kind === "CHARACTER";
       if (isCharacter) {
         attackUsed =
           (parsed.attackId && attacks.find((a: any) => a.id === parsed.attackId || a.name === parsed.attackId)) ||
           attacks[0];
         if (parsed.useSheet !== false && attackUsed) {
-          toHit = ruleset.computeAttack({ sheet: sheet ?? {}, attack: attackUsed });
+          toHit = ruleset.computeAttack({ sheet: sheet ?? {}, attack: attackUsed, context: conditionContext });
           damage = ruleset.computeDamage({
             sheet: sheet ?? {},
             attack: attackUsed,
             isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
+            context: conditionContext,
           });
         } else {
-          toHit = rollD20(parsed.toHitMod ?? 0);
-          damage = parsed.damageFormula ? rollFormula(parsed.damageFormula) : null;
+          const conditionMods = ruleset.applyConditionsModifiers({
+            ...conditionContext,
+            actionType: "ATTACK",
+            attack: attackUsed,
+          });
+          const mod = (parsed.toHitMod ?? 0) + (conditionMods.attackMod ?? 0);
+          const roll = rollD20(mod);
+          toHit = {
+            ...roll,
+            isCritThreat: roll.d20 === 20,
+            breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
+          };
+          const formula = parsed.damageFormula ?? "1d6";
+          const raw = rollFormula(formula);
+          const adjusted = raw.total + (conditionMods.damageMod ?? 0);
+          damage = { ...raw, total: adjusted };
         }
-      } else if (attacker) {
-        const mod = attacker.attackBonus ?? 0;
-        const roll = rollD20(mod);
-        toHit = {
-          ...roll,
-          isCritThreat: roll.d20 === 20,
-          breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
-        };
-        const formula = attacker.damageFormula ?? parsed.damageFormula ?? "1d6";
-        damage = rollFormula(formula);
       } else {
-        toHit = rollD20(parsed.toHitMod ?? 0);
-        damage = parsed.damageFormula ? rollFormula(parsed.damageFormula) : null;
+        attackUsed = {
+          name: attacker.name,
+          bonus: attacker.attackBonus ?? 0,
+          damage: attacker.damageFormula ?? "1d6",
+          critRange: 20,
+          critMultiplier: 2,
+          ability: "for",
+        };
+        toHit = ruleset.computeAttack({ sheet: {}, attack: attackUsed, context: conditionContext });
+        damage = ruleset.computeDamage({
+          sheet: {},
+          attack: attackUsed,
+          isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
+          context: conditionContext,
+        });
       }
-    } else if (parsed.kind === "SPELL") {
+    }
+
+    if (actionType === "SPELL") {
       spellUsed =
         (parsed.spellId && spells.find((s: any) => s.id === parsed.spellId || s.name === parsed.spellId)) ||
         spells[0];
-      const costParsed =
-        parsed.costMp ??
-        (spellUsed?.cost
-          ? typeof spellUsed.cost === "number"
-            ? spellUsed.cost
-            : Number(spellUsed.cost) || 0
-          : 0);
-      costMp = costParsed || 0;
-      if (parsed.damageFormula) {
-        damage = rollFormula(parsed.damageFormula);
-      } else if (spellUsed?.damage) {
-        damage = rollFormula(spellUsed.damage);
+
+      if (parsed.useSheet !== false && spellUsed) {
+        const spellResult = ruleset.computeSpell({ sheet: sheet ?? {}, spell: spellUsed, context: conditionContext });
+        toHit = spellResult.hitOrSaveResult ?? null;
+        damage = spellResult.damage ?? null;
+        costMp = spellResult.cost?.mp ?? 0;
+        effectsApplied = spellResult.effectsApplied ?? [];
+      } else {
+        const conditionMods = ruleset.applyConditionsModifiers({
+          ...conditionContext,
+          actionType: "SPELL",
+          spell: spellUsed,
+        });
+        const mod = (parsed.toHitMod ?? 0) + (conditionMods.spellMod ?? 0);
+        const roll = rollD20(mod);
+        toHit = {
+          d20: roll.d20,
+          mod,
+          total: roll.total,
+          breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
+        };
+        const formula = parsed.damageFormula;
+        if (formula) {
+          const raw = rollFormula(formula);
+          const adjusted = raw.total + (conditionMods.damageMod ?? 0);
+          damage = { ...raw, total: adjusted };
+        }
+        costMp = (parsed.costMp ?? 0) + (conditionMods.costMpMod ?? 0);
       }
-      toHit = rollD20(parsed.toHitMod ?? 0);
-    } else if ((parsed as any).kind === "SKILL") {
+      costMp = Math.max(0, costMp);
+    }
+
+    if (actionType === "SKILL") {
       skillUsed =
         (parsed.skillId && skills.find((s: any) => s.id === parsed.skillId || s.name === parsed.skillId)) ||
         skills[0];
-      const abilityKey = skillUsed?.ability ?? "int";
-      const abilityScore = typeof sheet?.[abilityKey] === "number" ? (sheet as any)[abilityKey] : 10;
-      const mod =
-        ruleset.getAbilityMod(abilityScore) +
-        (skillUsed?.bonus ?? 0) +
-        (skillUsed?.misc ?? 0) +
-        (skillUsed?.ranks ?? 0) +
-        (parsed.toHitMod ?? 0);
-      toHit = rollD20(mod);
+
+      if (parsed.useSheet !== false && skillUsed) {
+        const check = ruleset.computeSkillCheck({ sheet: sheet ?? {}, skill: skillUsed, context: conditionContext });
+        toHit = check;
+      } else {
+        const conditionMods = ruleset.applyConditionsModifiers({
+          ...conditionContext,
+          actionType: "SKILL",
+          skill: skillUsed,
+        });
+        const mod = (parsed.toHitMod ?? 0) + (conditionMods.skillMod ?? 0);
+        const roll = rollD20(mod);
+        toHit = {
+          d20: roll.d20,
+          mod,
+          total: roll.total,
+          breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
+        };
+      }
+    }
+
+    if (costMp > 0 && attacker.mpCurrent < costMp) {
+      return Response.json({ error: "PM insuficiente" }, { status: 400 });
     }
 
     let updatedTarget = target;
     let updatedAttacker = attacker;
 
-    const targetBefore = target?.hpCurrent;
-    const attackerMpBefore = attacker?.mpCurrent;
+    const targetBefore = target.hpCurrent;
+    const attackerMpBefore = attacker.mpCurrent;
 
     if (target && damage?.total) {
       const newHp = clamp(target.hpCurrent + -Math.abs(damage.total), 0, target.hpMax);
@@ -129,21 +238,30 @@ export async function POST(req: Request, { params }: Context) {
       });
     }
 
+    const conditionKeys = [
+      ...(parsed.conditionKeys ?? []),
+      ...effectsApplied
+        .map((entry) => entry?.conditionKey)
+        .filter((key): key is string => Boolean(key)),
+    ];
+    const conditionIds = parsed.conditionIds ?? [];
+    const conditionsToApply = await resolveConditions(ruleset.id, conditionIds, conditionKeys);
+
     const event = await prisma.combatEvent.create({
       data: {
         combatId: combat.id,
-        actorName: attacker?.name ?? parsed.actorName,
-        type: parsed.kind,
+        actorName: attacker.name,
+        type: actionType,
         visibility: parsed.visibility,
         payloadJson: {
-          actorId: attacker?.id ?? parsed.actorId,
-          actorName: attacker?.name ?? parsed.actorName,
-          targetId: target?.id ?? parsed.targetId,
-          targetName: target?.name,
+          actorId: attacker.id,
+          actorName: attacker.name,
+          targetId: target.id,
+          targetName: target.name,
           toHit,
           damage,
           damageFormula: parsed.damageFormula,
-          kind: parsed.kind,
+          kind: actionType,
           attackId: attackUsed?.id,
           attackName: attackUsed?.name,
           spellId: spellUsed?.id,
@@ -156,9 +274,21 @@ export async function POST(req: Request, { params }: Context) {
           hpAfter: updatedTarget?.hpCurrent,
           mpBefore: attackerMpBefore,
           mpAfter: updatedAttacker?.mpCurrent,
+          conditionsApplied: conditionsToApply,
         },
       },
     });
+
+    if (conditionsToApply.length) {
+      await prisma.appliedCondition.createMany({
+        data: conditionsToApply.map((condition) => ({
+          combatId: combat.id,
+          targetCombatantId: target.id,
+          conditionId: condition.id,
+          sourceEventId: event.id,
+        })),
+      });
+    }
 
     return Response.json({
       data: {

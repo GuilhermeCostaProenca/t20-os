@@ -50,6 +50,7 @@ type Props = {
 };
 
 type ActionResult = {
+  kind?: "ATTACK" | "SPELL" | "SKILL";
   attackName?: string;
   toHit?: {
     d20: number;
@@ -61,6 +62,7 @@ type ActionResult = {
     breakdown?: string;
   };
   damage?: { total: number; detail?: string; isCrit?: boolean };
+  costMp?: number;
 };
 
 export function CombatPanel({ campaignId, characters }: Props) {
@@ -69,8 +71,11 @@ export function CombatPanel({ campaignId, characters }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [attacker, setAttacker] = useState("");
   const [target, setTarget] = useState("");
+  const [actionKind, setActionKind] = useState<"ATTACK" | "SPELL" | "SKILL">("ATTACK");
   const [selectedAttackId, setSelectedAttackId] = useState("");
-  const [sheetData, setSheetData] = useState<Record<string, { attacks: any[] }>>({});
+  const [selectedSpellId, setSelectedSpellId] = useState("");
+  const [selectedSkillId, setSelectedSkillId] = useState("");
+  const [sheetData, setSheetData] = useState<Record<string, { attacks: any[]; spells: any[]; skills: any[] }>>({});
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const [overrideInputs, setOverrideInputs] = useState<Record<string, string>>({});
   const [pendingActions, setPendingActions] = useState<any[]>([]);
@@ -116,28 +121,53 @@ export function CombatPanel({ campaignId, characters }: Props) {
   useEffect(() => {
     if (!attacker) {
       setSelectedAttackId("");
+      setSelectedSpellId("");
+      setSelectedSkillId("");
       return;
     }
     const combatant = orderedCombatants.find((c) => c.id === attacker);
     if (!combatant || combatant.kind !== "CHARACTER" || !combatant.refId) {
       setSelectedAttackId("");
+      setSelectedSpellId("");
+      setSelectedSkillId("");
       return;
     }
     const cached = sheetData[attacker];
     if (cached) {
-      const list = cached.attacks ?? [];
-      if (list.length) {
-        const stillValid = list.find((a: any) => a.id === selectedAttackId || a.name === selectedAttackId);
+      const attackList = cached.attacks ?? [];
+      const spellList = cached.spells ?? [];
+      const skillList = cached.skills ?? [];
+
+      if (attackList.length) {
+        const stillValid = attackList.find((a: any) => a.id === selectedAttackId || a.name === selectedAttackId);
         if (!stillValid) {
-          setSelectedAttackId(list[0].id || list[0].name || "");
+          setSelectedAttackId(attackList[0].id || attackList[0].name || "");
         }
       } else {
         setSelectedAttackId("");
       }
+
+      if (spellList.length) {
+        const stillValid = spellList.find((s: any) => s.id === selectedSpellId || s.name === selectedSpellId);
+        if (!stillValid) {
+          setSelectedSpellId(spellList[0].id || spellList[0].name || "");
+        }
+      } else {
+        setSelectedSpellId("");
+      }
+
+      if (skillList.length) {
+        const stillValid = skillList.find((s: any) => s.id === selectedSkillId || s.name === selectedSkillId);
+        if (!stillValid) {
+          setSelectedSkillId(skillList[0].id || skillList[0].name || "");
+        }
+      } else {
+        setSelectedSkillId("");
+      }
       return;
     }
     void loadSheetData(combatant);
-  }, [attacker, orderedCombatants, sheetData, selectedAttackId]);
+  }, [attacker, orderedCombatants, sheetData, selectedAttackId, selectedSpellId, selectedSkillId]);
 
   async function refresh() {
     if (!campaignId) return;
@@ -175,9 +205,17 @@ export function CombatPanel({ campaignId, characters }: Props) {
       const payload = await res.json();
       if (!res.ok) return;
       const attacks = Array.isArray(payload.data?.attacks) ? payload.data.attacks : [];
-      setSheetData((prev) => ({ ...prev, [combatant.id]: { attacks } }));
+      const spells = Array.isArray(payload.data?.spells) ? payload.data.spells : [];
+      const skills = Array.isArray(payload.data?.skills) ? payload.data.skills : [];
+      setSheetData((prev) => ({ ...prev, [combatant.id]: { attacks, spells, skills } }));
       if (attacks.length) {
         setSelectedAttackId(attacks[0].id || attacks[0].name || "");
+      }
+      if (spells.length) {
+        setSelectedSpellId(spells[0].id || spells[0].name || "");
+      }
+      if (skills.length) {
+        setSelectedSkillId(skills[0].id || skills[0].name || "");
       }
     } catch (err) {
       console.error("loadSheetData", err);
@@ -305,22 +343,36 @@ export function CombatPanel({ campaignId, characters }: Props) {
       setStatus("Selecione atacante e alvo.");
       return;
     }
+    if (!attackerIsCharacter && actionKind !== "ATTACK") {
+      setStatus("Apenas personagens podem usar magia ou pericia.");
+      return;
+    }
     setLoading(true);
     setStatus("Executando acao...");
     try {
       const useSheet = attackerIsCharacter;
+      const body: Record<string, any> = {
+        actorId: attacker,
+        actorName: attackerEntity?.name ?? "Atacante",
+        kind: actionKind,
+        targetId: target,
+        useSheet,
+        visibility: "MASTER",
+      };
+      if (actionKind === "ATTACK" && useSheet) {
+        body.attackId = selectedAttackId || undefined;
+      }
+      if (actionKind === "SPELL" && useSheet) {
+        body.spellId = selectedSpellId || undefined;
+      }
+      if (actionKind === "SKILL" && useSheet) {
+        body.skillId = selectedSkillId || undefined;
+      }
+
       const res = await fetch(`/api/campaigns/${campaignId}/combat/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          actorId: attacker,
-          actorName: attackerEntity?.name ?? "Atacante",
-          kind: "ATTACK",
-          targetId: target,
-          useSheet,
-          attackId: useSheet ? selectedAttackId || undefined : undefined,
-          visibility: "MASTER",
-        }),
+        body: JSON.stringify(body),
       });
       const payload = await res.json();
       if (!res.ok) {
@@ -329,10 +381,14 @@ export function CombatPanel({ campaignId, characters }: Props) {
       setActionResult({
         attackName:
           payload.data?.event?.payloadJson?.attackName ||
+          payload.data?.event?.payloadJson?.spellName ||
+          payload.data?.event?.payloadJson?.skillName ||
           payload.data?.attack?.name ||
           attackerEntity?.name,
         toHit: payload.data?.toHit,
         damage: payload.data?.damage,
+        kind: actionKind,
+        costMp: payload.data?.event?.payloadJson?.costMp,
       });
       setStatus("Dano aplicado automaticamente.");
       await refresh();
@@ -572,11 +628,11 @@ export function CombatPanel({ campaignId, characters }: Props) {
 
       <Card className="chrome-panel border-white/10 bg-white/5">
         <CardHeader>
-          <CardTitle>Acao rapida (ataque da ficha)</CardTitle>
-          <CardDescription>Escolha atacante, alvo e ataque cadastrado. Dano aplicado automaticamente.</CardDescription>
+          <CardTitle>Acao rapida (ficha)</CardTitle>
+          <CardDescription>Escolha atacante, alvo e a acao da ficha. Dano aplicado automaticamente.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Atacante</label>
               <select
@@ -607,21 +663,59 @@ export function CombatPanel({ campaignId, characters }: Props) {
                 ))}
               </select>
             </div>
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">Tipo</label>
+              <select
+                value={actionKind}
+                onChange={(e) => setActionKind(e.target.value as any)}
+                className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+              >
+                <option value="ATTACK">Ataque</option>
+                <option value="SPELL">Magia</option>
+                <option value="SKILL">Pericia</option>
+              </select>
+            </div>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Ataque da ficha</label>
+              <label className="text-sm text-muted-foreground">
+                {actionKind === "SPELL" ? "Magia da ficha" : actionKind === "SKILL" ? "Pericia da ficha" : "Ataque da ficha"}
+              </label>
               <select
                 className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                value={selectedAttackId}
-                onChange={(e) => setSelectedAttackId(e.target.value)}
-                disabled={!attacker || !attackerIsCharacter}
+                value={
+                  actionKind === "SPELL" ? selectedSpellId : actionKind === "SKILL" ? selectedSkillId : selectedAttackId
+                }
+                onChange={(e) => {
+                  if (actionKind === "SPELL") setSelectedSpellId(e.target.value);
+                  if (actionKind === "SKILL") setSelectedSkillId(e.target.value);
+                  if (actionKind === "ATTACK") setSelectedAttackId(e.target.value);
+                }}
+                disabled={!attacker || (actionKind !== "ATTACK" && !attackerIsCharacter)}
               >
                 {(() => {
-                  if (!attackerIsCharacter) {
+                  if (actionKind === "ATTACK" && !attackerIsCharacter) {
                     return <option value="">Ataque base do inimigo</option>;
                   }
                   const data = sheetData[attacker];
+                  if (actionKind === "SPELL") {
+                    const list = data?.spells ?? [];
+                    if (!list?.length) return <option value="">Nenhuma magia</option>;
+                    return list.map((item: any) => (
+                      <option key={item.id || item.name} value={item.id || item.name}>
+                        {item.name ?? "Magia"}
+                      </option>
+                    ));
+                  }
+                  if (actionKind === "SKILL") {
+                    const list = data?.skills ?? [];
+                    if (!list?.length) return <option value="">Nenhuma pericia</option>;
+                    return list.map((item: any) => (
+                      <option key={item.id || item.name} value={item.id || item.name}>
+                        {item.name ?? "Pericia"}
+                      </option>
+                    ));
+                  }
                   const list = data?.attacks ?? [];
                   if (!list?.length) return <option value="">Padrao (bonus da ficha)</option>;
                   return list.map((item: any) => (
@@ -631,15 +725,28 @@ export function CombatPanel({ campaignId, characters }: Props) {
                   ));
                 })()}
               </select>
-              {!attackerIsCharacter && attackerEntity ? (
+              {!attackerIsCharacter && attackerEntity && actionKind === "ATTACK" ? (
                 <p className="text-xs text-muted-foreground">
                   Dano base: {attackerEntity.damageFormula ?? "1d6"}
                 </p>
               ) : null}
+              {!attackerIsCharacter && actionKind !== "ATTACK" ? (
+                <p className="text-xs text-muted-foreground">Acoes magicas exigem ficha.</p>
+              ) : null}
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Magia / Pericia</label>
-              <Input disabled value="Em breve - use ataque" className="h-10 bg-black/20 text-sm" />
+              <label className="text-sm text-muted-foreground">Resumo</label>
+              <Input
+                disabled
+                value={
+                  actionKind === "SPELL"
+                    ? "Consome PM automaticamente"
+                    : actionKind === "SKILL"
+                    ? "Registra rolagem"
+                    : "Ataque com dano automatico"
+                }
+                className="h-10 bg-black/20 text-sm"
+              />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -657,6 +764,11 @@ export function CombatPanel({ campaignId, characters }: Props) {
           {actionResult ? (
             <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm space-y-2">
               <div className="flex items-center gap-2">
+                {actionResult.kind ? (
+                  <Badge variant="outline" className="capitalize">
+                    {actionResult.kind.toLowerCase()}
+                  </Badge>
+                ) : null}
                 <Badge variant="outline">
                   d20 {actionResult.toHit?.total} ({actionResult.toHit?.d20})
                 </Badge>
@@ -674,6 +786,9 @@ export function CombatPanel({ campaignId, characters }: Props) {
                     {actionResult.damage.isCrit ? " (crit)" : ""}
                   </Badge>
                 ) : null}
+                {actionResult.costMp ? (
+                  <Badge variant="outline">PM -{actionResult.costMp}</Badge>
+                ) : null}
               </div>
               {actionResult.attackName ? (
                 <p className="text-muted-foreground">Ataque: {actionResult.attackName}</p>
@@ -681,7 +796,9 @@ export function CombatPanel({ campaignId, characters }: Props) {
               {actionResult.toHit?.breakdown ? (
                 <p className="text-muted-foreground text-xs">Ataque: {actionResult.toHit.breakdown}</p>
               ) : null}
-              <p className="text-xs text-muted-foreground">Dano ja aplicado no alvo.</p>
+              <p className="text-xs text-muted-foreground">
+                {actionResult.damage ? "Efeito aplicado no alvo." : "Rolagem registrada no log."}
+              </p>
             </div>
           ) : null}
         </CardContent>

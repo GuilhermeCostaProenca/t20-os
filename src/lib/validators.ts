@@ -166,20 +166,30 @@ export const CombatTurnSchema = z.object({
   direction: z.enum(["next", "prev"]).default("next"),
 });
 
-export const CombatActionSchema = z.object({
-  actorId: z.string().trim(),
-  actorName: z.string().trim(),
-  kind: z.enum(["ATTACK", "SPELL", "SKILL"]),
-  targetId: z.string().trim(),
-  toHitMod: z.number().int().optional(),
-  damageFormula: z.string().trim().max(50).optional(),
-  useSheet: z.boolean().optional(),
-  attackId: z.string().trim().optional(),
-  spellId: z.string().trim().optional(),
-  skillId: z.string().trim().optional(),
-  costMp: z.number().int().optional(),
-  visibility: z.enum(["MASTER", "PLAYERS"]).default("MASTER"),
-});
+const CombatActionTypeSchema = z.enum(["ATTACK", "SPELL", "SKILL"]);
+
+export const CombatActionSchema = z
+  .object({
+    actorId: z.string().trim(),
+    actorName: z.string().trim(),
+    kind: CombatActionTypeSchema.optional(),
+    type: CombatActionTypeSchema.optional(),
+    targetId: z.string().trim(),
+    toHitMod: z.number().int().optional(),
+    damageFormula: z.string().trim().max(50).optional(),
+    useSheet: z.boolean().optional(),
+    attackId: z.string().trim().optional(),
+    spellId: z.string().trim().optional(),
+    skillId: z.string().trim().optional(),
+    costMp: z.number().int().optional(),
+    conditionIds: z.array(z.string().trim()).optional(),
+    conditionKeys: z.array(z.string().trim()).optional(),
+    visibility: z.enum(["MASTER", "PLAYERS"]).default("MASTER"),
+  })
+  .refine((data) => data.kind || data.type, {
+    message: "Tipo de acao e obrigatorio",
+    path: ["kind"],
+  });
 
 export const CombatApplySchema = z.object({
   targetId: z.string().trim(),
