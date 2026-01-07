@@ -47,6 +47,7 @@ type Campaign = {
   name: string;
   description?: string | null;
   system: string;
+  roomCode: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -226,7 +227,7 @@ export default function CampaignPage() {
           </div>
         </div>
         <Separator className="my-6 border-white/10" />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-muted-foreground">
             <div className="text-xs uppercase tracking-[0.18em] text-primary">
               Personagens
@@ -241,6 +242,14 @@ export default function CampaignPage() {
             </div>
             <div className="text-xl font-semibold text-foreground">
               Tormenta 20
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-muted-foreground">
+            <div className="text-xs uppercase tracking-[0.18em] text-primary">
+              Room code
+            </div>
+            <div className="text-xl font-semibold text-foreground">
+              {campaign.roomCode}
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-muted-foreground">

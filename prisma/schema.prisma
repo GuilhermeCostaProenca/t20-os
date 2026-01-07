@@ -10,6 +10,7 @@ datasource db {
 model Campaign {
   id          String      @id @default(cuid())
   name        String      @db.VarChar(120)
+  roomCode    String      @unique @db.VarChar(12)
   system      String      @default("TORMENTA_20") @db.VarChar(40)
   rulesetId   String      @default("tormenta20") @db.VarChar(50)
   description String?     @db.VarChar(500)

@@ -21,6 +21,19 @@ type Reveal = {
   createdAt: string;
 };
 
+type Campaign = {
+  id: string;
+  name: string;
+  roomCode: string;
+};
+
+type Character = {
+  id: string;
+  name: string;
+  role?: string | null;
+  level: number;
+};
+
 export default function PlayRoomPage() {
   const params = useParams<{ roomCode: string }>();
   const roomCode = params?.roomCode?.toString().toUpperCase();
@@ -28,7 +41,9 @@ export default function PlayRoomPage() {
   const [lastId, setLastId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState("Conectado a mesa");
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [campaignId, setCampaignId] = useState("");
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [combatId, setCombatId] = useState<string | null>(null);
   const [combatants, setCombatants] = useState<any[]>([]);
   const [actor, setActor] = useState("");
@@ -69,6 +84,11 @@ export default function PlayRoomPage() {
     };
   }, [roomCode, lastId]);
 
+  useEffect(() => {
+    if (!roomCode) return;
+    loadCampaign(roomCode);
+  }, [roomCode]);
+
   const textContent = useMemo(() => {
     if (!reveal) return "";
     if (typeof reveal.content === "string") return reveal.content;
@@ -91,10 +111,52 @@ export default function PlayRoomPage() {
     }
   }
 
-  async function loadCombatants() {
-    if (!campaignId) return;
+  async function loadCampaign(code: string) {
+    setStatus("Carregando campanha...");
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/combat`, { cache: "no-store" });
+      const res = await fetch(`/api/campaigns?roomCode=${encodeURIComponent(code)}`, {
+        cache: "no-store",
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setStatus(payload.error ?? "Erro ao carregar campanha");
+        return;
+      }
+      const found = (payload.data ?? [])[0] as Campaign | undefined;
+      if (!found) {
+        setStatus("Campanha nao encontrada");
+        return;
+      }
+      setCampaign(found);
+      setCampaignId(found.id);
+      setStatus("Campanha carregada");
+      await Promise.all([loadCharacters(found.id), loadCombatants(found.id)]);
+    } catch (err) {
+      console.error(err);
+      setStatus("Erro ao carregar campanha");
+    }
+  }
+
+  async function loadCharacters(id: string) {
+    try {
+      const res = await fetch(`/api/campaigns/${id}/characters`, { cache: "no-store" });
+      const payload = await res.json();
+      if (!res.ok) {
+        setActionStatus(payload.error ?? "Erro ao carregar personagens");
+        return;
+      }
+      setCharacters(payload.data ?? []);
+    } catch (err) {
+      console.error(err);
+      setActionStatus("Erro ao carregar personagens");
+    }
+  }
+
+  async function loadCombatants(id?: string) {
+    const targetCampaignId = id ?? campaignId;
+    if (!targetCampaignId) return;
+    try {
+      const res = await fetch(`/api/campaigns/${targetCampaignId}/combat`, { cache: "no-store" });
       const payload = await res.json();
       if (!res.ok) {
         setActionStatus(payload.error ?? "Erro ao carregar combate");
@@ -111,7 +173,7 @@ export default function PlayRoomPage() {
 
   async function executeAction() {
     if (!campaignId || !actor || !target) {
-      setActionStatus("Preencha campanha/ator/alvo");
+      setActionStatus("Selecione personagem e alvo");
       return;
     }
     setActionStatus("Enviando acao...");
@@ -151,6 +213,53 @@ export default function PlayRoomPage() {
         </div>
 
         <Card className="chrome-panel border-white/10 bg-white/5">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle>{campaign?.name ?? "Campanha"}</CardTitle>
+              <CardDescription>
+                {campaign ? `Room code: ${campaign.roomCode}` : "Carregando campanha..."}
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => campaignId && Promise.all([loadCharacters(campaignId), loadCombatants(campaignId)])}
+              disabled={!campaignId}
+            >
+              Atualizar
+            </Button>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary">Personagens</p>
+              {characters.length ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {characters.map((character) => (
+                    <li key={character.id}>
+                      {character.name} {character.role ? `- ${character.role}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhum personagem cadastrado.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-primary">Combatentes</p>
+              {combatants.length ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {combatants.map((combatant) => (
+                    <li key={combatant.id}>{combatant.name}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Combate ainda nao iniciado.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="chrome-panel border-white/10 bg-white/5">
           <CardHeader>
             <CardTitle>Revelacoes</CardTitle>
             <CardDescription>Quando o mestre revelar algo, aparece aqui.</CardDescription>
@@ -175,10 +284,9 @@ export default function PlayRoomPage() {
             <CardDescription>Atacar / Magia / Pericia via ficha.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input placeholder="Campaign ID" value={campaignId} onChange={(e) => setCampaignId(e.target.value)} />
             <div className="flex gap-2">
-              <Button variant="outline" onClick={loadCombatants} disabled={!campaignId}>
-                Carregar combatentes
+              <Button variant="outline" onClick={() => loadCombatants()} disabled={!campaignId}>
+                Atualizar combate
               </Button>
               <select
                 className="h-10 flex-1 rounded-md border border-white/10 bg-black/20 px-3 text-sm"
