@@ -52,6 +52,7 @@ model Reveal {
 model CharacterSheet {
   id           String   @id @default(cuid())
   characterId  String   @unique
+  sheetRulesetId String  @db.VarChar(50) @default("tormenta20")
   level        Int      @default(1)
   className    String?  @db.VarChar(120)
   ancestry     String?  @db.VarChar(120)

@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/prisma";
 import { CharacterSheetView } from "@/components/character/character-sheet-view";
+import { prisma } from "@/lib/prisma";
+import { getRuleset } from "@/rulesets";
 import { notFound } from "next/navigation";
 
 type PageProps = {
@@ -13,31 +14,54 @@ async function getData(id: string) {
   });
   if (!character) return null;
 
+  const ruleset = getRuleset(character.campaign?.rulesetId);
+
+  const defaults = {
+    characterId: id,
+    sheetRulesetId: ruleset.id,
+    level: character.level ?? 1,
+    pvCurrent: 10,
+    pvMax: 10,
+    pmCurrent: 5,
+    pmMax: 5,
+    attackBonus: 0,
+    damageFormula: "1d6",
+    critRange: 20,
+    critMultiplier: 2,
+    defenseFinal: 10,
+    defenseRef: 0,
+    defenseFort: 0,
+    defenseWill: 0,
+    skills: [],
+    attacks: [],
+    spells: [],
+  };
+
+  const validatedDefaults = ruleset.validateSheet ? ruleset.validateSheet(defaults) : defaults;
+
   const sheet = await prisma.characterSheet.upsert({
     where: { characterId: id },
     update: {},
-    create: {
-      characterId: id,
-      level: character.level ?? 1,
-      pvCurrent: 10,
-      pvMax: 10,
-      pmCurrent: 5,
-      pmMax: 5,
-      attackBonus: 0,
-      damageFormula: "1d6",
-      critRange: 20,
-      critMultiplier: 2,
-      defenseFinal: 10,
-      defenseRef: 0,
-      defenseFort: 0,
-      defenseWill: 0,
-      skills: [],
-      attacks: [],
-      spells: [],
-    },
+    create: validatedDefaults,
   });
 
-  return { character, sheet };
+  const validatedExisting = ruleset.validateSheet ? ruleset.validateSheet(sheet) : sheet;
+  const hasChanges = validatedExisting && JSON.stringify(validatedExisting) !== JSON.stringify(sheet);
+  const dataToUpdate = (() => {
+    if (!validatedExisting) return {};
+    const clone = { ...(validatedExisting as any) };
+    delete clone.id;
+    delete clone.characterId;
+    delete clone.createdAt;
+    delete clone.updatedAt;
+    return clone;
+  })();
+  const finalSheet =
+    hasChanges && validatedExisting
+      ? await prisma.characterSheet.update({ where: { characterId: id }, data: dataToUpdate })
+      : validatedExisting;
+
+  return { character, sheet: finalSheet };
 }
 
 export default async function CharacterSheetPage({ params }: PageProps) {

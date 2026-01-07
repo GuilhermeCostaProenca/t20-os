@@ -5,13 +5,7 @@ import { Plus, Save, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,8 +30,8 @@ function uid() {
 }
 
 export function CharacterSheetView({ character, initialSheet, rulesetId }: Props) {
-  const ruleset = getRuleset(rulesetId);
   const [sheet, setSheet] = useState<any>(initialSheet);
+  const ruleset = getRuleset(sheet?.sheetRulesetId ?? rulesetId);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -63,7 +57,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
       const res = await fetch(`/api/characters/${character.id}/sheet`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sheet),
+        body: JSON.stringify({ ...sheet, sheetRulesetId: ruleset.id }),
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Falha ao salvar ficha");
@@ -98,9 +92,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
             <h1 className="text-3xl font-bold">{character.name}</h1>
             <Badge className="border-primary/40 bg-primary/10 text-primary">Personagem</Badge>
           </div>
-          <p className="text-muted-foreground">
-            Visual em seções, pronto para mesa. Todos os campos são editáveis.
-          </p>
+          <p className="text-muted-foreground">Visual em secoes, pronto para mesa. Todos os campos sao editaveis.</p>
         </div>
         <Button onClick={save} disabled={saving} className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
           <Save className="h-4 w-4" />
@@ -109,16 +101,14 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
       </div>
 
       {status ? (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground">
-          {status}
-        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground">{status}</div>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-1 chrome-panel border-white/10 bg-card/70">
           <CardHeader>
             <CardTitle>Overview</CardTitle>
-            <CardDescription>Resumo rápido do herói.</CardDescription>
+            <CardDescription>Resumo rapido do heroi.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -127,17 +117,13 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                 <Input value={character.name} readOnly className="bg-white/5" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground">Nível</label>
-                <Input
-                  type="number"
-                  value={sheet.level ?? 1}
-                  onChange={(e) => setField("level", Number(e.target.value))}
-                />
+                <label className="text-sm text-muted-foreground">Nivel</label>
+                <Input type="number" value={sheet.level ?? 1} onChange={(e) => setField("level", Number(e.target.value))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm text-muted-foreground">Classe / Raça</label>
+                <label className="text-sm text-muted-foreground">Classe / Raca</label>
                 <Input
                   placeholder="Guerreiro Humano"
                   value={sheet.className ?? ""}
@@ -146,20 +132,12 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">Divindade</label>
-                <Input
-                  placeholder="Kallyadranoch?"
-                  value={sheet.deity ?? ""}
-                  onChange={(e) => setField("deity", e.target.value)}
-                />
+                <Input placeholder="Kallyadranoch?" value={sheet.deity ?? ""} onChange={(e) => setField("deity", e.target.value)} />
               </div>
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Ancestralidade</label>
-              <Input
-                placeholder="Humano, Qareen..."
-                value={sheet.ancestry ?? ""}
-                onChange={(e) => setField("ancestry", e.target.value)}
-              />
+              <Input placeholder="Humano, Qareen..." value={sheet.ancestry ?? ""} onChange={(e) => setField("ancestry", e.target.value)} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Notas</label>
@@ -167,7 +145,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                 rows={3}
                 value={sheet.notes ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
-                placeholder="Vínculos, personalidade, anotações rápidas."
+                placeholder="Vinculos, personalidade, anotacoes rapidas."
               />
             </div>
           </CardContent>
@@ -176,7 +154,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
         <Card className="xl:col-span-2 chrome-panel border-white/10 bg-card/70">
           <CardHeader>
             <CardTitle>Atributos</CardTitle>
-            <CardDescription>Valores e modificadores automáticos.</CardDescription>
+            <CardDescription>Valores e modificadores automaticos.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             {sortedAbilities.map((ab) => (
@@ -205,8 +183,8 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
           </CardHeader>
           <CardContent className="space-y-3">
             {resources.map((res) => {
-              const currentKey = res.key === "pm" ? "pmCurrent" : "pvCurrent";
-              const maxKey = res.key === "pm" ? "pmMax" : "pvMax";
+              const currentKey = `${res.key}Current`;
+              const maxKey = `${res.key}Max`;
               return (
                 <div key={res.key} className="grid grid-cols-2 gap-3">
                   <div>
@@ -218,7 +196,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-muted-foreground">{res.label} Máx</label>
+                    <label className="text-sm text-muted-foreground">{res.label} Max</label>
                     <Input
                       type="number"
                       value={sheet[maxKey] ?? 0}
@@ -233,41 +211,25 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
 
         <Card className="chrome-panel border-white/10 bg-card/70 xl:col-span-2">
           <CardHeader>
-            <CardTitle>Defesas e Resistências</CardTitle>
+            <CardTitle>Defesas e Resistencias</CardTitle>
             <CardDescription>Valores prontos para a rolagem.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>
               <label className="text-sm text-muted-foreground">Defesa</label>
-              <Input
-                type="number"
-                value={sheet.defenseFinal ?? 0}
-                onChange={(e) => setField("defenseFinal", Number(e.target.value))}
-              />
+              <Input type="number" value={sheet.defenseFinal ?? 0} onChange={(e) => setField("defenseFinal", Number(e.target.value))} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Reflexos</label>
-              <Input
-                type="number"
-                value={sheet.defenseRef ?? 0}
-                onChange={(e) => setField("defenseRef", Number(e.target.value))}
-              />
+              <Input type="number" value={sheet.defenseRef ?? 0} onChange={(e) => setField("defenseRef", Number(e.target.value))} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Fortitude</label>
-              <Input
-                type="number"
-                value={sheet.defenseFort ?? 0}
-                onChange={(e) => setField("defenseFort", Number(e.target.value))}
-              />
+              <Input type="number" value={sheet.defenseFort ?? 0} onChange={(e) => setField("defenseFort", Number(e.target.value))} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground">Vontade</label>
-              <Input
-                type="number"
-                value={sheet.defenseWill ?? 0}
-                onChange={(e) => setField("defenseWill", Number(e.target.value))}
-              />
+              <Input type="number" value={sheet.defenseWill ?? 0} onChange={(e) => setField("defenseWill", Number(e.target.value))} />
             </div>
           </CardContent>
         </Card>
@@ -276,8 +238,8 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
       <Card className="chrome-panel border-white/10 bg-card/70">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle>Perícias</CardTitle>
-            <CardDescription>Lista editável com modificador automático.</CardDescription>
+            <CardTitle>Pericias</CardTitle>
+            <CardDescription>Lista editavel com modificador automatico.</CardDescription>
           </div>
           <Button
             size="sm"
@@ -285,7 +247,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
             onClick={() =>
               updateArray("skills", (items) => [
                 ...items,
-                { id: uid(), name: "Nova perícia", ability: "int", bonus: 0, trained: false },
+                { id: uid(), name: "Nova pericia", ability: ruleset.abilities[0]?.key ?? "int", bonus: 0, trained: false },
               ])
             }
           >
@@ -294,11 +256,9 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          {(sheet.skills as any[])?.length ? null : (
-            <p className="text-sm text-muted-foreground">Nenhuma perícia cadastrada.</p>
-          )}
+          {(sheet.skills as any[])?.length ? null : <p className="text-sm text-muted-foreground">Nenhuma pericia cadastrada.</p>}
           {(sheet.skills as any[])?.map((skill: any, idx: number) => {
-            const ability = skill.ability ?? "int";
+            const ability = skill.ability ?? ruleset.abilities[0]?.key ?? "int";
             const total =
               (abilityMods[ability] ?? 0) +
               (skill.bonus ?? 0) +
@@ -306,10 +266,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
               (skill.ranks ?? 0) +
               (skill.trained ? 2 : 0);
             return (
-              <div
-                key={skill.id || idx}
-                className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-7"
-              >
+              <div key={skill.id || idx} className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-7">
                 <Input
                   className="md:col-span-2"
                   value={skill.name ?? ""}
@@ -364,7 +321,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                       items.map((it) => (it.id === skill.id ? { ...it, bonus: Number(e.target.value) } : it))
                     )
                   }
-                  placeholder="Bônus"
+                  placeholder="Bonus"
                 />
                 <div className="flex items-center justify-between rounded-md border border-white/10 bg-black/20 px-3 text-sm font-semibold">
                   <span>Total</span>
@@ -380,7 +337,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle>Ataques</CardTitle>
-            <CardDescription>Bônus, dano e crítico preparados.</CardDescription>
+            <CardDescription>Bonus, dano e critico preparados.</CardDescription>
           </div>
           <Button
             size="sm"
@@ -391,7 +348,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                 {
                   id: uid(),
                   name: "Novo ataque",
-                  ability: "for",
+                  ability: ruleset.abilities[0]?.key ?? "for",
                   bonus: 0,
                   damage: "1d6",
                   critRange: 20,
@@ -406,14 +363,9 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          {(sheet.attacks as any[])?.length ? null : (
-            <p className="text-sm text-muted-foreground">Nenhum ataque cadastrado.</p>
-          )}
+          {(sheet.attacks as any[])?.length ? null : <p className="text-sm text-muted-foreground">Nenhum ataque cadastrado.</p>}
           {(sheet.attacks as any[])?.map((atk: any, idx: number) => (
-            <div
-              key={atk.id || idx}
-              className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-6"
-            >
+            <div key={atk.id || idx} className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-6">
               <Input
                 className="md:col-span-2"
                 value={atk.name ?? ""}
@@ -426,7 +378,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
               />
               <select
                 className="rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                value={atk.ability ?? "for"}
+                value={atk.ability ?? ruleset.abilities[0]?.key ?? "for"}
                 onChange={(e) =>
                   updateArray("attacks", (items) =>
                     items.map((it) => (it.id === atk.id ? { ...it, ability: e.target.value } : it))
@@ -447,7 +399,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                     items.map((it) => (it.id === atk.id ? { ...it, bonus: Number(e.target.value) } : it))
                   )
                 }
-                placeholder="Bônus"
+                placeholder="Bonus"
               />
               <Input
                 value={atk.damage ?? ""}
@@ -474,9 +426,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                   value={atk.critMultiplier ?? 2}
                   onChange={(e) =>
                     updateArray("attacks", (items) =>
-                      items.map((it) =>
-                        it.id === atk.id ? { ...it, critMultiplier: Number(e.target.value) } : it
-                      )
+                      items.map((it) => (it.id === atk.id ? { ...it, critMultiplier: Number(e.target.value) } : it))
                     )
                   }
                   placeholder="x2"
@@ -500,7 +450,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle>Magias</CardTitle>
-            <CardDescription>Círculo, custo e efeito resumidos.</CardDescription>
+            <CardDescription>Circulo, custo e efeito resumidos.</CardDescription>
           </div>
           <Button
             size="sm"
@@ -517,14 +467,9 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          {(sheet.spells as any[])?.length ? null : (
-            <p className="text-sm text-muted-foreground">Nenhuma magia cadastrada.</p>
-          )}
+          {(sheet.spells as any[])?.length ? null : <p className="text-sm text-muted-foreground">Nenhuma magia cadastrada.</p>}
           {(sheet.spells as any[])?.map((spell: any, idx: number) => (
-            <div
-              key={spell.id || idx}
-              className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-6"
-            >
+            <div key={spell.id || idx} className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-6">
               <Input
                 className="md:col-span-2"
                 value={spell.name ?? ""}
@@ -542,7 +487,7 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
                     items.map((it) => (it.id === spell.id ? { ...it, circle: e.target.value } : it))
                   )
                 }
-                placeholder="Círculo"
+                placeholder="Circulo"
               />
               <Input
                 value={spell.cost ?? ""}

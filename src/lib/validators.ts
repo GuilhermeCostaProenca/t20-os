@@ -53,6 +53,7 @@ export const RevealAckSchema = z.object({
 });
 
 export const CharacterSheetUpdateSchema = z.object({
+  sheetRulesetId: z.string().trim().optional(),
   level: z.number().int().min(1).max(20).optional(),
   className: z.string().trim().max(120).optional(),
   ancestry: z.string().trim().max(120).optional(),
@@ -80,7 +81,7 @@ export const CharacterSheetUpdateSchema = z.object({
       z.object({
         id: z.string().optional(),
         name: z.string().trim().min(1),
-        ability: z.enum(["for", "des", "con", "int", "sab", "car"]).optional(),
+        ability: z.string().trim().max(20).optional(),
         trained: z.boolean().optional(),
         ranks: z.number().int().optional(),
         bonus: z.number().int().optional(),
@@ -93,7 +94,7 @@ export const CharacterSheetUpdateSchema = z.object({
       z.object({
         id: z.string().optional(),
         name: z.string().trim().min(1),
-        ability: z.enum(["for", "des", "con", "int", "sab", "car"]).optional(),
+        ability: z.string().trim().max(20).optional(),
         bonus: z.number().int().optional(),
         damage: z.string().trim().max(50).optional(),
         critRange: z.number().int().min(1).max(20).optional(),
