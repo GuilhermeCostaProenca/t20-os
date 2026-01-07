@@ -86,6 +86,10 @@ export const CharacterSheetUpdateSchema = z.object({
         ranks: z.number().int().optional(),
         bonus: z.number().int().optional(),
         misc: z.number().int().optional(),
+        type: z.string().trim().max(50).optional(),
+        cost: z.number().int().optional(),
+        formula: z.string().trim().max(50).optional(),
+        cd: z.number().int().optional(),
       })
     )
     .optional(),
@@ -110,7 +114,13 @@ export const CharacterSheetUpdateSchema = z.object({
         name: z.string().trim().min(1),
         circle: z.string().trim().max(50).optional(),
         cost: z.union([z.string(), z.number()]).optional(),
+        type: z.string().trim().max(50).optional(),
+        formula: z.string().trim().max(50).optional(),
+        cd: z.number().int().optional(),
+        ability: z.string().trim().max(20).optional(),
+        effectsApplied: z.array(z.any()).optional(),
         description: z.string().trim().max(2000).optional(),
+        damage: z.string().trim().max(50).optional(),
       })
     )
     .optional(),

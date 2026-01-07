@@ -245,9 +245,19 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
             size="sm"
             variant="outline"
             onClick={() =>
-              updateArray("skills", (items) => [
+            updateArray("skills", (items) => [
                 ...items,
-                { id: uid(), name: "Nova pericia", ability: ruleset.abilities[0]?.key ?? "int", bonus: 0, trained: false },
+                {
+                  id: uid(),
+                  name: "Nova pericia",
+                  ability: ruleset.abilities[0]?.key ?? "int",
+                  bonus: 0,
+                  trained: false,
+                  type: "check",
+                  cost: 0,
+                  formula: "",
+                  cd: 0,
+                },
               ])
             }
           >
@@ -456,9 +466,9 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
             size="sm"
             variant="outline"
             onClick={() =>
-              updateArray("spells", (items) => [
+            updateArray("spells", (items) => [
                 ...items,
-                { id: uid(), name: "Nova magia", circle: "", cost: "", description: "" },
+                { id: uid(), name: "Nova magia", circle: "", cost: 0, description: "", type: "attack", formula: "", cd: 0 },
               ])
             }
           >
@@ -469,37 +479,71 @@ export function CharacterSheetView({ character, initialSheet, rulesetId }: Props
         <CardContent className="space-y-2">
           {(sheet.spells as any[])?.length ? null : <p className="text-sm text-muted-foreground">Nenhuma magia cadastrada.</p>}
           {(sheet.spells as any[])?.map((spell: any, idx: number) => (
-            <div key={spell.id || idx} className="grid gap-2 rounded-lg border border-white/10 bg-white/5 p-3 md:grid-cols-6">
-              <Input
-                className="md:col-span-2"
-                value={spell.name ?? ""}
-                onChange={(e) =>
-                  updateArray("spells", (items) =>
-                    items.map((it) => (it.id === spell.id ? { ...it, name: e.target.value } : it))
-                  )
-                }
-                placeholder="Nome"
-              />
-              <Input
-                value={spell.circle ?? ""}
-                onChange={(e) =>
-                  updateArray("spells", (items) =>
-                    items.map((it) => (it.id === spell.id ? { ...it, circle: e.target.value } : it))
-                  )
-                }
-                placeholder="Circulo"
-              />
-              <Input
-                value={spell.cost ?? ""}
-                onChange={(e) =>
-                  updateArray("spells", (items) =>
-                    items.map((it) => (it.id === spell.id ? { ...it, cost: e.target.value } : it))
-                  )
-                }
-                placeholder="Custo PM"
-              />
+            <div key={spell.id || idx} className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+              <div className="grid gap-2 md:grid-cols-6">
+                <Input
+                  className="md:col-span-2"
+                  value={spell.name ?? ""}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, name: e.target.value } : it))
+                    )
+                  }
+                  placeholder="Nome"
+                />
+                <Input
+                  value={spell.circle ?? ""}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, circle: e.target.value } : it))
+                    )
+                  }
+                  placeholder="Circulo"
+                />
+                <select
+                  className="rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                  value={spell.type ?? "attack"}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, type: e.target.value } : it))
+                    )
+                  }
+                >
+                  <option value="attack">Ataque</option>
+                  <option value="save">Salvacao</option>
+                  <option value="utility">Util</option>
+                </select>
+                <Input
+                  type="number"
+                  value={spell.cost ?? 0}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, cost: Number(e.target.value) } : it))
+                    )
+                  }
+                  placeholder="Custo PM"
+                />
+                <Input
+                  value={spell.formula ?? ""}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, formula: e.target.value } : it))
+                    )
+                  }
+                  placeholder="Formula"
+                />
+                <Input
+                  type="number"
+                  value={spell.cd ?? 0}
+                  onChange={(e) =>
+                    updateArray("spells", (items) =>
+                      items.map((it) => (it.id === spell.id ? { ...it, cd: Number(e.target.value) } : it))
+                    )
+                  }
+                  placeholder="CD"
+                />
+              </div>
               <Textarea
-                className="md:col-span-3"
                 rows={2}
                 value={spell.description ?? ""}
                 onChange={(e) =>

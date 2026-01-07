@@ -1,7 +1,15 @@
 import { rollD20, rollFormula } from "@/lib/t20/dice";
 import { abilityMod } from "@/lib/t20/modifiers";
 
-import { AttackResult, DamageResult, Ruleset } from "../base/types";
+import {
+  AttackResult,
+  CheckResult,
+  ConditionContext,
+  ConditionModifiers,
+  DamageResult,
+  Ruleset,
+  SpellResult,
+} from "../base/types";
 
 const abilities = [
   { key: "for", label: "Forca", order: 1 },
@@ -54,6 +62,10 @@ function normalizeSkill(skill: any): any {
     ranks: numberOr(skill?.ranks, 0),
     bonus: numberOr(skill?.bonus, 0),
     misc: numberOr(skill?.misc, 0),
+    type: textOr(skill?.type, "check"),
+    cost: numberOr(skill?.cost, 0),
+    formula: textOr(skill?.formula, ""),
+    cd: numberOr(skill?.cd ?? skill?.dc, 0),
   };
 }
 
@@ -62,13 +74,90 @@ function normalizeSpell(spell: any): any {
     id: textOr(spell?.id, ensureId("spell")),
     name: textOr(spell?.name, "Magia"),
     circle: textOr(spell?.circle, ""),
-    cost: typeof spell?.cost === "number" || typeof spell?.cost === "string" ? spell.cost : "",
+    cost: numberOr(typeof spell?.cost === "string" ? Number(spell?.cost) : spell?.cost, 0),
     description: textOr(spell?.description, ""),
     damage: textOr(spell?.damage, spell?.damageFormula ?? ""),
+    formula: textOr(spell?.formula, spell?.damage ?? spell?.damageFormula ?? ""),
+    cd: numberOr(spell?.cd ?? spell?.dc, 0),
+    type: textOr(spell?.type, "attack"),
+    ability: typeof spell?.ability === "string" ? spell.ability : "int",
+    effectsApplied: Array.isArray(spell?.effectsApplied) ? spell.effectsApplied : [],
   };
 }
 
-function computeAttack({ sheet, attack }: { sheet: any; attack?: any }): AttackResult {
+function extractModifiers(entry: any) {
+  const effects = entry?.condition?.effectsJson ?? entry?.effectsJson ?? {};
+  const mods = effects?.modifiers ?? effects ?? {};
+  return {
+    attack: numberOr(mods?.attack, 0),
+    skill: numberOr(mods?.skill, 0),
+    spell: numberOr(mods?.spell, 0),
+    damage: numberOr(mods?.damage, 0),
+    costMp: numberOr(mods?.costMp, 0),
+    dc: numberOr(mods?.dc, 0),
+    defense: numberOr(mods?.defense, 0),
+    damageTaken: numberOr(mods?.damageTaken, 0),
+  };
+}
+
+function sumModifiers(conditions: any[]): ReturnType<typeof extractModifiers> {
+  return (conditions ?? []).reduce(
+    (acc, entry) => {
+      const mods = extractModifiers(entry);
+      acc.attack += mods.attack;
+      acc.skill += mods.skill;
+      acc.spell += mods.spell;
+      acc.damage += mods.damage;
+      acc.costMp += mods.costMp;
+      acc.dc += mods.dc;
+      acc.defense += mods.defense;
+      acc.damageTaken += mods.damageTaken;
+      return acc;
+    },
+    {
+      attack: 0,
+      skill: 0,
+      spell: 0,
+      damage: 0,
+      costMp: 0,
+      dc: 0,
+      defense: 0,
+      damageTaken: 0,
+    }
+  );
+}
+
+function applyConditionsModifiers(context: ConditionContext): ConditionModifiers {
+  const actorMods = sumModifiers(context?.actorConditions ?? []);
+  const targetMods = sumModifiers(context?.targetConditions ?? []);
+  const attackMod = actorMods.attack + (targetMods.defense ? -targetMods.defense : 0);
+  const damageMod = actorMods.damage + targetMods.damageTaken;
+  const notes: string[] = [];
+  if (attackMod) notes.push(`Ataque ${attackMod >= 0 ? "+" : ""}${attackMod}`);
+  if (actorMods.skill) notes.push(`Pericia ${actorMods.skill >= 0 ? "+" : ""}${actorMods.skill}`);
+  if (actorMods.spell) notes.push(`Magia ${actorMods.spell >= 0 ? "+" : ""}${actorMods.spell}`);
+  if (damageMod) notes.push(`Dano ${damageMod >= 0 ? "+" : ""}${damageMod}`);
+  if (actorMods.costMp) notes.push(`PM ${actorMods.costMp >= 0 ? "+" : ""}${actorMods.costMp}`);
+  return {
+    attackMod,
+    skillMod: actorMods.skill,
+    spellMod: actorMods.spell,
+    damageMod,
+    costMpMod: actorMods.costMp,
+    dcMod: actorMods.dc,
+    notes: notes.length ? notes : undefined,
+  };
+}
+
+function computeAttack({
+  sheet,
+  attack,
+  context,
+}: {
+  sheet: any;
+  attack?: any;
+  context?: ConditionContext;
+}): AttackResult {
   const baseAbility = typeof sheet?.for === "number" ? sheet.for : 10;
   const abilityScore =
     typeof attack?.ability === "string" && typeof sheet?.[attack.ability] === "number"
@@ -82,7 +171,12 @@ function computeAttack({ sheet, attack }: { sheet: any; attack?: any }): AttackR
       : typeof sheet?.attackBonus === "number"
       ? sheet.attackBonus
       : 0;
-  const mod = abilityMod(abilityScore) + attackBonus;
+  const conditionMods = applyConditionsModifiers({
+    ...(context ?? {}),
+    actionType: "ATTACK",
+    attack,
+  });
+  const mod = abilityMod(abilityScore) + attackBonus + (conditionMods.attackMod ?? 0);
   const roll = rollD20(mod);
   const critRange =
     typeof attack?.critRange === "number"
@@ -95,7 +189,9 @@ function computeAttack({ sheet, attack }: { sheet: any; attack?: any }): AttackR
   return {
     ...roll,
     isCritThreat,
-    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}`,
+    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${
+      conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+    }`,
     attackName: attack?.name,
   };
 }
@@ -104,10 +200,12 @@ function computeDamage({
   sheet,
   attack,
   isCrit,
+  context,
 }: {
   sheet: any;
   attack?: any;
   isCrit: boolean;
+  context?: ConditionContext;
 }): DamageResult {
   const formulaCandidate =
     typeof attack?.damage === "string" && attack.damage.trim().length > 0
@@ -123,10 +221,121 @@ function computeDamage({
       ? sheet.critMultiplier
       : 2;
 
+  const conditionMods = applyConditionsModifiers({
+    ...(context ?? {}),
+    actionType: "ATTACK",
+    attack,
+  });
   const roll = rollFormula(formula);
-  const total = isCrit ? roll.total * critMultiplier : roll.total;
+  const adjusted = roll.total + (conditionMods.damageMod ?? 0);
+  const total = isCrit ? adjusted * critMultiplier : adjusted;
+  const detail = `${roll.detail}${conditionMods.damageMod ? (conditionMods.damageMod > 0 ? "+" : "") + conditionMods.damageMod : ""}`;
 
-  return { ...roll, total, isCrit, attackName: attack?.name };
+  return { ...roll, total, detail, isCrit, attackName: attack?.name };
+}
+
+function computeSkillCheck({
+  sheet,
+  skill,
+  context,
+}: {
+  sheet: any;
+  skill?: any;
+  context?: ConditionContext;
+}): CheckResult {
+  const abilityKey = skill?.ability ?? "int";
+  const abilityScore = typeof sheet?.[abilityKey] === "number" ? sheet[abilityKey] : 10;
+  const baseMod =
+    abilityMod(abilityScore) +
+    numberOr(skill?.bonus, 0) +
+    numberOr(skill?.misc, 0) +
+    numberOr(skill?.ranks, 0) +
+    (skill?.trained ? 2 : 0);
+  const conditionMods = applyConditionsModifiers({
+    ...(context ?? {}),
+    actionType: "SKILL",
+    skill,
+  });
+  const mod = baseMod + (conditionMods.skillMod ?? 0);
+  const roll = rollD20(mod);
+  return {
+    d20: roll.d20,
+    mod,
+    total: roll.total,
+    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${
+      conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+    }`,
+  };
+}
+
+function computeSpell({
+  sheet,
+  spell,
+  context,
+}: {
+  sheet: any;
+  spell?: any;
+  context?: ConditionContext;
+}): SpellResult {
+  const normalized = normalizeSpell(spell);
+  const conditionMods = applyConditionsModifiers({
+    ...(context ?? {}),
+    actionType: "SPELL",
+    spell: normalized,
+  });
+  const costMp = numberOr(normalized.cost, 0) + (conditionMods.costMpMod ?? 0);
+  const type = textOr(normalized.type, "attack").toLowerCase();
+  const abilityKey = normalized.ability ?? "int";
+  const abilityScore = typeof sheet?.[abilityKey] === "number" ? sheet[abilityKey] : 10;
+  const baseMod = abilityMod(abilityScore) + (conditionMods.spellMod ?? 0);
+
+  let hitOrSaveResult: CheckResult | undefined;
+  if (type === "save") {
+    const cd = numberOr(normalized.cd, 0) + (conditionMods.dcMod ?? 0);
+    hitOrSaveResult = {
+      d20: 0,
+      mod: conditionMods.dcMod ?? 0,
+      total: cd,
+      breakdown: `CD ${cd}`,
+    };
+  } else {
+    const roll = rollD20(baseMod);
+    hitOrSaveResult = {
+      d20: roll.d20,
+      mod: baseMod,
+      total: roll.total,
+      breakdown: `d20=${roll.d20} + ${baseMod} = ${roll.total}${
+        conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+      }`,
+    };
+  }
+
+  const formula = textOr(normalized.formula, "");
+  const damage =
+    formula && formula.length > 0
+      ? (() => {
+          const roll = rollFormula(formula);
+          const adjusted = roll.total + (conditionMods.damageMod ?? 0);
+          return {
+            total: adjusted,
+            detail: `${roll.detail}${conditionMods.damageMod ? (conditionMods.damageMod > 0 ? "+" : "") + conditionMods.damageMod : ""}`,
+            isCrit: false,
+            attackName: normalized.name,
+          };
+        })()
+      : null;
+
+  return {
+    hitOrSaveResult,
+    damage,
+    cost: { mp: costMp },
+    effectsApplied: Array.isArray(normalized.effectsApplied)
+      ? normalized.effectsApplied.map((entry: any) =>
+          typeof entry === "string" ? { conditionKey: entry } : entry
+        )
+      : [],
+    breakdown: hitOrSaveResult?.breakdown,
+  };
 }
 
 function validateSheet(sheet: any) {
@@ -172,6 +381,9 @@ export const tormenta20Ruleset: Ruleset = {
   resources,
   computeAttack,
   computeDamage,
+  computeSkillCheck,
+  computeSpell,
+  applyConditionsModifiers,
   getAbilityMod: abilityMod,
   validateSheet,
 };
