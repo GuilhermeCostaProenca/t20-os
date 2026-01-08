@@ -106,7 +106,8 @@ export function SessionDialog() {
       const dataUrl = await generateQrDataUrl(roomLink);
       setQrData(dataUrl);
     } catch (err) {
-      console.error(err);
+      setRevealStatus("Falha ao gerar QR Code");
+      setTimeout(() => setRevealStatus(null), 2000);
     } finally {
       setQrLoading(false);
     }
@@ -114,9 +115,14 @@ export function SessionDialog() {
 
   async function copyLink() {
     if (!roomLink) return;
-    await navigator.clipboard.writeText(roomLink);
-    setRevealStatus("Link copiado");
-    setTimeout(() => setRevealStatus(null), 1500);
+    try {
+      await navigator.clipboard.writeText(roomLink);
+      setRevealStatus("Link copiado");
+    } catch (err) {
+      setRevealStatus("Falha ao copiar link");
+    } finally {
+      setTimeout(() => setRevealStatus(null), 1500);
+    }
   }
 
   async function handleRevealSubmit() {
@@ -138,7 +144,7 @@ export function SessionDialog() {
           visibility: "players",
         }),
       });
-      const payload = await res.json();
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload.error ?? "Falha ao revelar");
       }
@@ -161,7 +167,7 @@ export function SessionDialog() {
           <span className="hidden sm:inline">Modo sessao</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="chrome-panel max-w-5xl border-white/10 bg-card/90 p-0 text-left backdrop-blur">
+      <DialogContent className="chrome-panel max-w-5xl border-white/10 bg-card/90 p-0 text-left backdrop-blur max-h-[85vh] overflow-y-auto">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>Modo Sessao</DialogTitle>
           <DialogDescription>
@@ -188,7 +194,7 @@ export function SessionDialog() {
           {revealStatus ? <span className="text-xs text-muted-foreground">{revealStatus}</span> : null}
         </div>
 
-        <div className="grid gap-4 px-6 pb-6 lg:grid-cols-[1.2fr_1fr]">
+        <div className="grid gap-4 px-6 pb-6 md:grid-cols-[1.2fr_1fr]">
           <Card className="chrome-panel border-white/10 bg-black/30">
             <CardHeader className="space-y-3">
               <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Plus, Sparkles, Swords } from "lucide-react";
 
@@ -69,7 +69,7 @@ export default function DashboardPage() {
     setError(null);
     try {
       const res = await fetch("/api/campaigns", { cache: "no-store" });
-      const payload = await res.json();
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload.error ?? "Não foi possível carregar campanhas");
       }
@@ -85,7 +85,8 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleCreate() {
+  async function handleCreate(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setFormError(null);
     const parsed = CampaignCreateSchema.safeParse(form);
     if (!parsed.success) {
@@ -100,15 +101,14 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
-      const payload = await res.json();
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload.error ?? "Não foi possível criar a campanha");
       }
 
-      const created: Campaign = payload.data ?? payload;
-      setCampaigns((prev) => [created, ...prev]);
       setForm(initialForm);
       setDialogOpen(false);
+      await loadCampaigns();
     } catch (err) {
       const message =
         err instanceof Error
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                   campos automaticamente.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <form className="space-y-4" onSubmit={handleCreate}>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Nome
@@ -197,6 +197,7 @@ export default function DashboardPage() {
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="ghost"
+                    type="button"
                     onClick={() => setDialogOpen(false)}
                     className="text-muted-foreground"
                     disabled={submitting}
@@ -204,14 +205,14 @@ export default function DashboardPage() {
                     Cancelar
                   </Button>
                   <Button
-                    onClick={handleCreate}
+                    type="submit"
                     disabled={submitting}
                     className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
                   >
                     {submitting ? "Salvando..." : "Criar campanha"}
                   </Button>
                 </div>
-              </div>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
