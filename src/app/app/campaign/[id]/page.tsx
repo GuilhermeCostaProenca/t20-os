@@ -73,6 +73,7 @@ type Session = {
   description?: string | null;
   coverUrl?: string | null;
   scheduledAt?: string | null;
+  status?: "planned" | "active" | "finished";
   createdAt: string;
   updatedAt: string;
 };
@@ -105,6 +106,7 @@ const initialSession = {
   description: "",
   scheduledAt: toDatetimeLocal(new Date()),
   coverUrl: "",
+  status: "planned",
 };
 
 export default function CampaignPage() {
@@ -336,6 +338,7 @@ export default function CampaignPage() {
       description: session.description ?? "",
       scheduledAt: toDatetimeLocal(session.scheduledAt),
       coverUrl: session.coverUrl ?? "",
+      status: session.status ?? "planned",
     });
     setSessionFormError(null);
     setSessionDialogOpen(true);
@@ -354,6 +357,7 @@ export default function CampaignPage() {
       description: sessionForm.description,
       scheduledAt: scheduledAt ? scheduledAt.toISOString() : undefined,
       coverUrl: sessionForm.coverUrl,
+      status: sessionForm.status,
     });
     if (!parsed.success) {
       setSessionFormError(parsed.error.issues[0]?.message ?? "Dados invalidos");
@@ -890,6 +894,25 @@ export default function CampaignPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">
+                        Status
+                      </label>
+                      <select
+                        className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
+                        value={sessionForm.status}
+                        onChange={(e) =>
+                          setSessionForm((prev) => ({
+                            ...prev,
+                            status: e.target.value as "planned" | "active" | "finished",
+                          }))
+                        }
+                      >
+                        <option value="planned">Planejada</option>
+                        <option value="active">Ativa</option>
+                        <option value="finished">Encerrada</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
                         Capa (opcional)
                       </label>
                       <Input
@@ -978,6 +1001,12 @@ export default function CampaignPage() {
                 const displayDate = new Date(
                   session.scheduledAt ?? session.updatedAt
                 ).toLocaleString("pt-BR");
+                const statusLabel =
+                  session.status === "active"
+                    ? "Ativa"
+                    : session.status === "finished"
+                    ? "Encerrada"
+                    : "Planejada";
                 return (
                   <Card
                     key={session.id}
@@ -993,9 +1022,14 @@ export default function CampaignPage() {
                     <CardHeader className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-lg">{session.title}</CardTitle>
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {displayDate}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {statusLabel}
+                          </Badge>
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {displayDate}
+                          </Badge>
+                        </div>
                       </div>
                       <CardDescription>
                         {session.description || "Sem descricao registrada."}

@@ -215,6 +215,7 @@ model Session {
   description String?  @db.VarChar(1000)
   coverUrl    String?  @db.VarChar(500)
   scheduledAt DateTime?
+  status      String   @default("planned") @db.VarChar(16)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

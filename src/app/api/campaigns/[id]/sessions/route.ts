@@ -60,6 +60,7 @@ export async function POST(req: Request, { params }: Context) {
         description: parsed.description,
         coverUrl: parsed.coverUrl,
         scheduledAt: parsed.scheduledAt ? new Date(parsed.scheduledAt) : null,
+        status: parsed.status ?? "planned",
       },
     });
 

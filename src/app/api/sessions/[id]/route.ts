@@ -33,6 +33,7 @@ export async function PUT(req: Request, { params }: Context) {
         description: parsed.description ?? null,
         coverUrl: parsed.coverUrl ?? null,
         scheduledAt: parsed.scheduledAt ? new Date(parsed.scheduledAt) : null,
+        status: parsed.status ?? "planned",
       },
     });
 

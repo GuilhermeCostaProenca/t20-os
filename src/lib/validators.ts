@@ -201,6 +201,7 @@ export const SessionCreateSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   scheduledAt: z.string().datetime().optional(),
+  status: z.enum(["planned", "active", "finished"]).optional(),
   coverUrl: z
     .string()
     .trim()
