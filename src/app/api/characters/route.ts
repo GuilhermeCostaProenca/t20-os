@@ -26,9 +26,7 @@ export async function GET(req: Request) {
     return Response.json({ data: characters });
   } catch (error) {
     console.error("GET /api/characters", error);
-    return Response.json(
-      { error: "Nao foi possivel listar personagens." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel listar personagens.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

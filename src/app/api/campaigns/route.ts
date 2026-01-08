@@ -43,10 +43,8 @@ export async function GET(req: Request) {
     return Response.json({ data: campaigns });
   } catch (error) {
     console.error("GET /api/campaigns", error);
-    return Response.json(
-      { error: "Não foi possível listar campanhas." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel listar campanhas.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }
 
@@ -69,16 +67,12 @@ export async function POST(req: Request) {
     return Response.json({ data: campaign }, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((issue) => issue.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((issue) => issue.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     console.error("POST /api/campaigns", error);
-    return Response.json(
-      { error: "Não foi possível criar a campanha." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel criar a campanha.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

@@ -2,19 +2,28 @@ import { prisma } from "@/lib/prisma";
 import { CombatConditionRemoveSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { combatId: string } };
+type Context = { params: { combatId: string } | Promise<{ combatId: string }> };
+
+function missingCombatId() {
+  const message = "Parametro combatId obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 export async function POST(req: Request, { params }: Context) {
+  let combatId = "";
   try {
+    ({ combatId } = await Promise.resolve(params));
+    if (!combatId) return missingCombatId();
     const payload = await req.json();
     const parsed = CombatConditionRemoveSchema.parse(payload);
 
     const combat = await prisma.combat.findUnique({
-      where: { id: params.combatId },
+      where: { id: combatId },
       include: { campaign: { select: { rulesetId: true } } },
     });
     if (!combat) {
-      return Response.json({ error: "Combate nao encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     let appliedConditions = [];
@@ -26,7 +35,8 @@ export async function POST(req: Request, { params }: Context) {
         include: { condition: true, target: true },
       });
       if (!found || found.combatId !== combat.id) {
-        return Response.json({ error: "Condicao aplicada nao encontrada" }, { status: 404 });
+        const message = "Condicao aplicada nao encontrada.";
+        return Response.json({ error: message, message }, { status: 404 });
       }
       appliedConditions = [found];
       condition = { id: found.condition.id, key: found.condition.key, name: found.condition.name };
@@ -34,7 +44,8 @@ export async function POST(req: Request, { params }: Context) {
       if (parsed.conditionId) {
         const found = await prisma.condition.findUnique({ where: { id: parsed.conditionId } });
         if (!found) {
-          return Response.json({ error: "Condicao nao encontrada" }, { status: 404 });
+          const message = "Condicao nao encontrada.";
+          return Response.json({ error: message, message }, { status: 404 });
         }
         condition = { id: found.id, key: found.key, name: found.name };
       } else if (parsed.conditionKey) {
@@ -47,7 +58,8 @@ export async function POST(req: Request, { params }: Context) {
           },
         });
         if (!found) {
-          return Response.json({ error: "Condicao nao encontrada" }, { status: 404 });
+          const message = "Condicao nao encontrada.";
+          return Response.json({ error: message, message }, { status: 404 });
         }
         condition = { id: found.id, key: found.key, name: found.name };
       }
@@ -63,7 +75,8 @@ export async function POST(req: Request, { params }: Context) {
     }
 
     if (!appliedConditions.length) {
-      return Response.json({ error: "Nenhuma condicao aplicada encontrada" }, { status: 404 });
+      const message = "Nenhuma condicao aplicada encontrada.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const target = appliedConditions[0].target;
@@ -91,15 +104,11 @@ export async function POST(req: Request, { params }: Context) {
     return Response.json({ data: { removed: appliedConditions.length }, event });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/combat/[combatId]/conditions/remove", error);
-    return Response.json(
-      { error: "Nao foi possivel remover a condicao." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel remover a condicao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

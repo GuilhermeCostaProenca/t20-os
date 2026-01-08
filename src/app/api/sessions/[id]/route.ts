@@ -2,12 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { SessionUpdateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: Promise<{ id: string }> };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 export async function PUT(req: Request, { params }: Context) {
   let id = "";
   try {
-    ({ id } = await params);
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = SessionUpdateSchema.parse(payload);
 
@@ -16,7 +22,8 @@ export async function PUT(req: Request, { params }: Context) {
       select: { id: true },
     });
     if (!existing) {
-      return Response.json({ error: "Sessao nao encontrada." }, { status: 404 });
+      const message = "Sessao nao encontrada.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const updated = await prisma.session.update({
@@ -32,32 +39,34 @@ export async function PUT(req: Request, { params }: Context) {
     return Response.json({ data: updated });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((issue) => issue.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((issue) => issue.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("PUT /api/sessions/[id]", error);
-    return Response.json({ error: "Nao foi possivel atualizar a sessao." }, { status: 500 });
+    const message = "Nao foi possivel atualizar a sessao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }
 
 export async function DELETE(_req: Request, { params }: Context) {
   let id = "";
   try {
-    ({ id } = await params);
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const existing = await prisma.session.findUnique({
       where: { id },
       select: { id: true },
     });
     if (!existing) {
-      return Response.json({ error: "Sessao nao encontrada." }, { status: 404 });
+      const message = "Sessao nao encontrada.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     await prisma.session.delete({ where: { id } });
     return Response.json({ data: { id } });
   } catch (error) {
     console.error("DELETE /api/sessions/[id]", error);
-    return Response.json({ error: "Nao foi possivel remover a sessao." }, { status: 500 });
+    const message = "Nao foi possivel remover a sessao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

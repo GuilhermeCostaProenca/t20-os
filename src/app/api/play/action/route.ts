@@ -43,9 +43,11 @@ export async function POST(req: Request) {
     return Response.json({ data: created }, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json({ error: error.issues.map((i) => i.message).join(", ") }, { status: 400 });
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/play/action", error);
-    return Response.json({ error: "Nao foi possivel criar a acao" }, { status: 500 });
+    const message = "Nao foi possivel criar a acao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

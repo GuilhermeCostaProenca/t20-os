@@ -3,7 +3,12 @@ import { rollD20 } from "@/lib/t20/dice";
 import { CombatantCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 function npcRefId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -13,14 +18,17 @@ function npcRefId() {
 }
 
 export async function POST(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = CombatantCreateSchema.parse(payload);
 
     const combat = await prisma.combat.upsert({
-      where: { campaignId: params.id },
+      where: { campaignId: id },
       update: { isActive: true },
-      create: { campaignId: params.id },
+      create: { campaignId: id },
     });
 
     const initiative = rollD20(0).total;
@@ -44,15 +52,11 @@ export async function POST(req: Request, { params }: Context) {
     return Response.json({ data: combatant }, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((issue) => issue.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((issue) => issue.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/campaigns/[id]/combat/combatants", error);
-    return Response.json(
-      { error: "Nao foi possivel criar o inimigo." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel criar o inimigo.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

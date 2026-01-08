@@ -16,20 +16,20 @@ export async function POST(req: Request) {
       },
     });
     if (!combat) {
-      return Response.json({ error: "Combate não encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const attacker = combat.combatants.find((c) => c.id === parsed.attackerCombatantId);
     const target = combat.combatants.find((c) => c.id === parsed.targetCombatantId);
     if (!attacker || !target) {
-      return Response.json({ error: "Atacante ou alvo não encontrado" }, { status: 404 });
+      const message = "Atacante ou alvo nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     if (attacker.kind !== "CHARACTER") {
-      return Response.json(
-        { error: "Apenas personagens vinculados têm ficha automática" },
-        { status: 400 }
-      );
+      const message = "Apenas personagens vinculados tem ficha automatica.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const sheet = await prisma.characterSheet.findUnique({
@@ -79,12 +79,11 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/combat/attack-from-sheet", error);
-    return Response.json({ error: "Falha ao rolar ataque." }, { status: 500 });
+    const message = "Falha ao rolar ataque.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

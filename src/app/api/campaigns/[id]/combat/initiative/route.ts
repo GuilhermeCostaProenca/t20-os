@@ -4,22 +4,32 @@ import { rollD20 } from "@/lib/t20/dice";
 import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 export async function POST(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
+
     const payload = await req.json();
     const parsed = CombatInitiativeSchema.parse(payload);
 
     const combat = await prisma.combat.findUnique({
-      where: { campaignId: params.id },
+      where: { campaignId: id },
       include: {
         combatants: true,
         campaign: { select: { rulesetId: true } },
       },
     });
     if (!combat) {
-      return Response.json({ error: "Combate não encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const existingExtras = combat.combatants.filter((c) => c.kind !== "CHARACTER");
@@ -55,15 +65,11 @@ export async function POST(req: Request, { params }: Context) {
     return Response.json({ data: ordered });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/campaigns/[id]/combat/initiative", error);
-    return Response.json(
-      { error: "Não foi possível rolar iniciativa." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel rolar iniciativa.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

@@ -16,21 +16,18 @@ export async function POST(req: Request) {
     });
 
     if (updated.count === 0) {
-      return Response.json({ error: "Reveal não encontrado." }, { status: 404 });
+      const message = "Reveal nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     return Response.json({ success: true });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/reveal/ack", error);
-    return Response.json(
-      { error: "Não foi possível confirmar o reveal." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel confirmar o reveal.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

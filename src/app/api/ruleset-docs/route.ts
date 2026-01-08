@@ -28,10 +28,12 @@ export async function POST(req: Request) {
     const textIndex = (form.get("textIndex") as string | null) ?? undefined;
 
     if (!file || typeof file === "string") {
-      return Response.json({ error: "Arquivo nao enviado" }, { status: 400 });
+      const message = "Arquivo nao enviado.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
     if (!title) {
-      return Response.json({ error: "Titulo e obrigatorio" }, { status: 400 });
+      const message = "Titulo e obrigatorio.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -57,6 +59,7 @@ export async function POST(req: Request) {
     return Response.json({ data: doc }, { status: 201 });
   } catch (error) {
     console.error("POST /api/ruleset-docs", error);
-    return Response.json({ error: "Falha ao salvar documento" }, { status: 500 });
+    const message = "Falha ao salvar documento.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

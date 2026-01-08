@@ -2,24 +2,35 @@ import { prisma } from "@/lib/prisma";
 import { CombatApplySchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 export async function POST(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
+
     const payload = await req.json();
     const parsed = CombatApplySchema.parse(payload);
 
     const combat = await prisma.combat.findUnique({
-      where: { campaignId: params.id },
+      where: { campaignId: id },
       include: { combatants: true },
     });
     if (!combat) {
-      return Response.json({ error: "Combate não encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const target = combat.combatants.find((c) => c.id === parsed.targetId);
     if (!target) {
-      return Response.json({ error: "Alvo não encontrado" }, { status: 404 });
+      const message = "Alvo nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const newHp =
@@ -58,15 +69,11 @@ export async function POST(req: Request, { params }: Context) {
     return Response.json({ data: updated });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/campaigns/[id]/combat/apply", error);
-    return Response.json(
-      { error: "Não foi possível aplicar a alteração." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel aplicar a alteracao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

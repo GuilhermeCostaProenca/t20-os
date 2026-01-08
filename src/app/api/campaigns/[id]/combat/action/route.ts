@@ -5,7 +5,7 @@ import { clamp } from "@/lib/t20/modifiers";
 import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
 
 type ActionType = "ATTACK" | "SPELL" | "SKILL";
 
@@ -14,6 +14,11 @@ type ConditionRef = {
   key: string;
   name: string;
 };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 function resolveActionType(parsed: any): ActionType {
   return (parsed.kind ?? parsed.type ?? "ATTACK") as ActionType;
@@ -52,20 +57,24 @@ async function resolveConditions(
 }
 
 export async function POST(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = CombatActionSchema.parse(payload);
     const actionType = resolveActionType(parsed);
 
     const combat = await prisma.combat.findUnique({
-      where: { campaignId: params.id },
+      where: { campaignId: id },
       include: {
         combatants: true,
         campaign: { select: { rulesetId: true } },
       },
     });
     if (!combat) {
-      return Response.json({ error: "Combate nao encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const ruleset = getRuleset(combat.campaign?.rulesetId);
@@ -73,7 +82,8 @@ export async function POST(req: Request, { params }: Context) {
     const target = combat.combatants.find((c) => c.id === parsed.targetId);
 
     if (!attacker || !target) {
-      return Response.json({ error: "Ator ou alvo nao encontrado" }, { status: 404 });
+      const message = "Ator ou alvo nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const [actorConditions, targetConditions] = await Promise.all([
@@ -213,7 +223,8 @@ export async function POST(req: Request, { params }: Context) {
     }
 
     if (costMp > 0 && attacker.mpCurrent < costMp) {
-      return Response.json({ error: "PM insuficiente" }, { status: 400 });
+      const message = "PM insuficiente.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     let updatedTarget = target;
@@ -301,15 +312,11 @@ export async function POST(req: Request, { params }: Context) {
     });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/campaigns/[id]/combat/action", error);
-    return Response.json(
-      { error: "Nao foi possivel processar a acao." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel processar a acao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

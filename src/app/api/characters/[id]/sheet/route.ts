@@ -3,7 +3,12 @@ import { CharacterSheetUpdateSchema } from "@/lib/validators";
 import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 function stripNonUpdatable(sheet: any) {
   if (!sheet) return {};
@@ -59,27 +64,34 @@ async function upsertDefault(characterId: string, rulesetId: string) {
 }
 
 export async function GET(_req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const character = await prisma.character.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { campaign: { select: { rulesetId: true } } },
     });
     const rulesetId = character?.campaign?.rulesetId ?? "tormenta20";
-    const sheet = await upsertDefault(params.id, rulesetId);
+    const sheet = await upsertDefault(id, rulesetId);
     return Response.json({ data: sheet });
   } catch (error) {
     console.error("GET /api/characters/[id]/sheet", error);
-    return Response.json({ error: "Nao foi possivel carregar a ficha." }, { status: 500 });
+    const message = "Nao foi possivel carregar a ficha.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }
 
 export async function PUT(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = CharacterSheetUpdateSchema.parse(payload);
 
     const character = await prisma.character.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { campaign: { select: { rulesetId: true } } },
     });
     const rulesetId = parsed.sheetRulesetId ?? character?.campaign?.rulesetId ?? "tormenta20";
@@ -88,20 +100,19 @@ export async function PUT(req: Request, { params }: Context) {
     const validated = ruleset.validateSheet ? ruleset.validateSheet(sheetData) : sheetData;
 
     const sheet = await prisma.characterSheet.upsert({
-      where: { characterId: params.id },
+      where: { characterId: id },
       update: validated,
-      create: { characterId: params.id, ...validated },
+      create: { characterId: id, ...validated },
     });
 
     return Response.json({ data: sheet });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("PUT /api/characters/[id]/sheet", error);
-    return Response.json({ error: "Nao foi possivel atualizar a ficha." }, { status: 500 });
+    const message = "Nao foi possivel atualizar a ficha.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

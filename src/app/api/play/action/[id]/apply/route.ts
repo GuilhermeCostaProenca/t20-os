@@ -5,7 +5,12 @@ import { getRuleset } from "@/rulesets";
 import { ActionRequestApplySchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } };
+type Context = { params: { id: string } | Promise<{ id: string }> };
+
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 type ActionType = "ATTACK" | "SPELL" | "SKILL";
 
@@ -48,21 +53,26 @@ async function resolveConditions(
 }
 
 export async function POST(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = ActionRequestApplySchema.parse(payload ?? {});
 
-    const request = await prisma.actionRequest.findUnique({ where: { id: params.id } });
+    const request = await prisma.actionRequest.findUnique({ where: { id } });
     if (!request) {
-      return Response.json({ error: "Requisicao nao encontrada" }, { status: 404 });
+      const message = "Requisicao nao encontrada.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
     if (request.status !== "PENDING") {
-      return Response.json({ error: "Requisicao ja processada" }, { status: 400 });
+      const message = "Requisicao ja processada.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     if (parsed.action === "reject") {
       const rejected = await prisma.actionRequest.update({
-        where: { id: params.id },
+        where: { id },
         data: { status: "REJECTED" },
       });
       return Response.json({ data: rejected });
@@ -73,14 +83,16 @@ export async function POST(req: Request, { params }: Context) {
       include: { combatants: true, campaign: { select: { rulesetId: true } } },
     });
     if (!combat) {
-      return Response.json({ error: "Combate nao encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const ruleset = getRuleset(combat.campaign?.rulesetId);
     const attacker = combat.combatants.find((c) => c.id === request.actorId);
     const target = combat.combatants.find((c) => c.id === request.targetId);
     if (!attacker || !target) {
-      return Response.json({ error: "Ator ou alvo invalido" }, { status: 400 });
+      const message = "Ator ou alvo invalido.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const [actorConditions, targetConditions] = await Promise.all([
@@ -197,7 +209,8 @@ export async function POST(req: Request, { params }: Context) {
     }
 
     if (costMp > 0 && attacker.mpCurrent < costMp) {
-      return Response.json({ error: "PM insuficiente" }, { status: 400 });
+      const message = "PM insuficiente.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const targetBefore = target.hpCurrent;
@@ -274,17 +287,19 @@ export async function POST(req: Request, { params }: Context) {
     }
 
     await prisma.actionRequest.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: "APPLIED" },
     });
 
     return Response.json({ data: { event, target: updatedTarget, toHit, damage } });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json({ error: error.issues.map((i) => i.message).join(", ") }, { status: 400 });
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/play/action/[id]/apply", error);
-    return Response.json({ error: "Nao foi possivel aplicar" }, { status: 500 });
+    const message = "Nao foi possivel aplicar.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }
 

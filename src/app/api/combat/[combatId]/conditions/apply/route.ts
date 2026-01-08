@@ -2,26 +2,36 @@ import { prisma } from "@/lib/prisma";
 import { CombatConditionApplySchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { combatId: string } };
+type Context = { params: { combatId: string } | Promise<{ combatId: string }> };
+
+function missingCombatId() {
+  const message = "Parametro combatId obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
 
 export async function POST(req: Request, { params }: Context) {
+  let combatId = "";
   try {
+    ({ combatId } = await Promise.resolve(params));
+    if (!combatId) return missingCombatId();
     const payload = await req.json();
     const parsed = CombatConditionApplySchema.parse(payload);
 
     const combat = await prisma.combat.findUnique({
-      where: { id: params.combatId },
+      where: { id: combatId },
       include: { campaign: { select: { rulesetId: true } } },
     });
     if (!combat) {
-      return Response.json({ error: "Combate nao encontrado" }, { status: 404 });
+      const message = "Combate nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const target = await prisma.combatant.findUnique({
       where: { id: parsed.targetCombatantId },
     });
     if (!target || target.combatId !== combat.id) {
-      return Response.json({ error: "Alvo nao encontrado" }, { status: 404 });
+      const message = "Alvo nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const condition = parsed.conditionId
@@ -36,7 +46,8 @@ export async function POST(req: Request, { params }: Context) {
         });
 
     if (!condition) {
-      return Response.json({ error: "Condicao nao encontrada" }, { status: 404 });
+      const message = "Condicao nao encontrada.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const event = await prisma.combatEvent.create({
@@ -69,15 +80,11 @@ export async function POST(req: Request, { params }: Context) {
     return Response.json({ data: applied, event }, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return Response.json(
-        { error: error.issues.map((i) => i.message).join(", ") },
-        { status: 400 }
-      );
+      const message = error.issues.map((i) => i.message).join(", ");
+      return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("POST /api/combat/[combatId]/conditions/apply", error);
-    return Response.json(
-      { error: "Nao foi possivel aplicar a condicao." },
-      { status: 500 }
-    );
+    const message = "Nao foi possivel aplicar a condicao.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }

@@ -14,11 +14,13 @@ export async function POST(req: Request) {
     const file = formData.get("file");
 
     if (!file || !(file instanceof File)) {
-      return Response.json({ error: "Arquivo invalido." }, { status: 400 });
+      const message = "Arquivo invalido.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     if (file.type && !file.type.startsWith("image/")) {
-      return Response.json({ error: "Envie apenas imagens." }, { status: 400 });
+      const message = "Envie apenas imagens.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
     return Response.json({ url: `/uploads/${filename}` }, { status: 201 });
   } catch (error) {
     console.error("POST /api/upload", error);
-    return Response.json({ error: "Nao foi possivel enviar o arquivo." }, { status: 500 });
+    const message = "Nao foi possivel enviar o arquivo.";
+    return Response.json({ error: message, message }, { status: 500 });
   }
 }
