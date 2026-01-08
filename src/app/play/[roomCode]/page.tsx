@@ -398,19 +398,20 @@ export default function PlayRoomPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg border-white/10 bg-background/95 text-left">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] w-[95vw] max-w-lg flex-col overflow-hidden border-white/10 bg-background/95 p-0 text-left">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
             <DialogTitle className="flex items-center gap-2">
               <Badge className="border-primary/25 bg-primary/10 text-primary capitalize">{reveal?.type}</Badge>
               {reveal?.title}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
             {reveal?.imageUrl ? (
               <img src={reveal.imageUrl} alt={reveal.title} className="w-full rounded-lg border border-white/10 object-cover" />
             ) : null}
             {textContent ? <p className="text-sm text-foreground">{textContent}</p> : null}
-            <Separator className="border-white/10" />
+          </div>
+          <div className="shrink-0 border-t border-white/10 px-6 py-4">
             <Button className="w-full" onClick={ackReveal}>
               Fechar
             </Button>

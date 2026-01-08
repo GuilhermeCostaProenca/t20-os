@@ -154,16 +154,17 @@ export default function DashboardPage() {
                 Nova campanha
               </Button>
             </DialogTrigger>
-            <DialogContent className="chrome-panel border-white/10 bg-card/80 backdrop-blur">
-              <DialogHeader>
+            <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
+              <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
                 <DialogTitle>Nova campanha</DialogTitle>
                 <DialogDescription>
                   Defina um nome épico e uma descrição curta. Validamos os
                   campos automaticamente.
                 </DialogDescription>
               </DialogHeader>
-              <form className="space-y-4" onSubmit={handleCreate}>
-                <div className="space-y-2">
+              <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreate}>
+                <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
+                  <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
                     Nome
                   </label>
@@ -194,23 +195,26 @@ export default function DashboardPage() {
                 {formError ? (
                   <p className="text-sm text-destructive">{formError}</p>
                 ) : null}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => setDialogOpen(false)}
-                    className="text-muted-foreground"
-                    disabled={submitting}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={submitting}
-                    className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
-                  >
-                    {submitting ? "Salvando..." : "Criar campanha"}
-                  </Button>
+                </div>
+                <div className="shrink-0 border-t border-white/10 px-6 py-4">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      onClick={() => setDialogOpen(false)}
+                      className="text-muted-foreground"
+                      disabled={submitting}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
+                    >
+                      {submitting ? "Salvando..." : "Criar campanha"}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </DialogContent>

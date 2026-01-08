@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, Plus, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -173,7 +173,7 @@ export function CombatPanel({ campaignId, characters }: Props) {
     if (!campaignId) return;
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/combat`, { cache: "no-store" });
-      const payload = await res.json();
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         setStatus(payload.error ?? "Falha ao carregar combate");
         return;
@@ -190,7 +190,7 @@ export function CombatPanel({ campaignId, characters }: Props) {
     if (!campaignId) return;
     try {
       const res = await fetch(`/api/play/action?campaignId=${campaignId}`, { cache: "no-store" });
-      const payload = await res.json();
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) return;
       setPendingActions(payload.data ?? []);
     } catch (err) {
@@ -236,7 +236,8 @@ export function CombatPanel({ campaignId, characters }: Props) {
     }
   }
 
-  async function createNpc() {
+  async function createNpc(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     if (!campaignId) return;
     if (!npcForm.name.trim()) {
       setNpcError("Defina um nome para o inimigo.");
@@ -424,7 +425,9 @@ export function CombatPanel({ campaignId, characters }: Props) {
                 >
                   <div>
                     <p className="font-semibold">
-                      {actorName} -> {targetName}
+                      {actorName}
+                      {" -> "}
+                      {targetName}
                     </p>
                     <p className="text-xs text-muted-foreground">Tipo: {req.type} • Room: {req.roomCode ?? "?"}</p>
                   </div>
@@ -477,12 +480,13 @@ export function CombatPanel({ campaignId, characters }: Props) {
                   Adicionar inimigo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="chrome-panel border-white/10 bg-card/90 backdrop-blur">
-                <DialogHeader>
+              <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-lg flex-col overflow-hidden border-white/10 bg-card/90 p-0 text-left backdrop-blur">
+                <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
                   <DialogTitle>Novo inimigo</DialogTitle>
                   <DialogDescription>Defina nome, PV, defesa e dano base.</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3">
+                <form className="flex min-h-0 flex-1 flex-col" onSubmit={createNpc}>
+                  <div className="flex-1 space-y-3 overflow-y-auto px-6 pb-4">
                   <div className="space-y-1">
                     <label className="text-sm text-muted-foreground">Nome</label>
                     <Input
@@ -529,20 +533,24 @@ export function CombatPanel({ campaignId, characters }: Props) {
                     />
                   </div>
                   {npcError ? <p className="text-sm text-destructive">{npcError}</p> : null}
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      className="text-muted-foreground"
-                      onClick={() => setNpcDialogOpen(false)}
-                      disabled={npcSubmitting}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={createNpc} disabled={npcSubmitting}>
-                      {npcSubmitting ? "Criando..." : "Adicionar"}
-                    </Button>
                   </div>
-                </div>
+                  <div className="shrink-0 border-t border-white/10 px-6 py-4">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        className="text-muted-foreground"
+                        onClick={() => setNpcDialogOpen(false)}
+                        disabled={npcSubmitting}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={npcSubmitting}>
+                        {npcSubmitting ? "Criando..." : "Adicionar"}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
               </DialogContent>
             </Dialog>
             <Button onClick={startCombat} disabled={loading || !campaignId}>
@@ -833,7 +841,10 @@ export function CombatPanel({ campaignId, characters }: Props) {
                       </Badge>
                       <span className="font-semibold">{payload.actorName ?? ev.actorName}</span>
                       {payload.targetName || payload.targetId ? (
-                        <span className="text-muted-foreground">-> {payload.targetName ?? payload.targetId}</span>
+                        <span className="text-muted-foreground">
+                          {" -> "}
+                          {payload.targetName ?? payload.targetId}
+                        </span>
                       ) : null}
                     </div>
                     <span className="text-xs text-muted-foreground">

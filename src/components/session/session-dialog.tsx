@@ -167,14 +167,15 @@ export function SessionDialog() {
           <span className="hidden sm:inline">Modo sessao</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="chrome-panel max-w-5xl border-white/10 bg-card/90 p-0 text-left backdrop-blur max-h-[85vh] overflow-y-auto">
-        <DialogHeader className="px-6 pt-6">
+      <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-5xl flex-col overflow-hidden border-white/10 bg-card/90 p-0 text-left backdrop-blur">
+        <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
           <DialogTitle>Modo Sessao</DialogTitle>
           <DialogDescription>
             Timer, rolagens, NPCs, notas rapidas e revelacoes para jogadores.
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto">
         <div className="flex flex-wrap items-center gap-3 px-6">
           <Badge className="border-primary/25 bg-primary/10 text-primary">Room code: {roomCode || "----"}</Badge>
           <Button variant="outline" size="sm" onClick={copyLink} disabled={!roomLink}>
@@ -405,6 +406,7 @@ export function SessionDialog() {
               })
             )}
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
