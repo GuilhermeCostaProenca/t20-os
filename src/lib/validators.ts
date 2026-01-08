@@ -52,6 +52,39 @@ export const CharacterCreateSchema = z.object({
 
 export const CharacterUpdateSchema = CharacterCreateSchema;
 
+export const NpcCreateSchema = z.object({
+  name: z.string().trim().min(1, "Nome obrigatorio"),
+  type: z.enum(["npc", "enemy"]).optional(),
+  hpMax: z.coerce.number().int().min(1, "PV minimo e 1"),
+  defenseFinal: z.coerce.number().int().min(0, "Defesa minima e 0").optional(),
+  damageFormula: z
+    .string()
+    .trim()
+    .max(50)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Descricao pode ter ate 1000 caracteres")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  tags: z
+    .string()
+    .trim()
+    .max(500, "Tags muito longas")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  imageUrl: z
+    .string()
+    .trim()
+    .max(500, "URL muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+});
+
+export const NpcUpdateSchema = NpcCreateSchema;
+
 export const RevealCreateSchema = z.object({
   roomCode: z.string().trim().min(4).max(12),
   type: z.enum(["npc", "item", "image", "note"]),

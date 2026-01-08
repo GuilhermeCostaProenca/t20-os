@@ -18,6 +18,7 @@ model Campaign {
   updatedAt   DateTime    @updatedAt
 
   characters  Character[]
+  npcs        Npc[]
   sessions    Session[]
   combat      Combat?
 }
@@ -222,6 +223,25 @@ model Session {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, scheduledAt])
+}
+
+model Npc {
+  id            String   @id @default(cuid())
+  campaignId    String
+  name          String   @db.VarChar(120)
+  type          String   @default("npc") @db.VarChar(12)
+  hpMax         Int      @default(1)
+  defenseFinal  Int      @default(10)
+  damageFormula String   @default("1d6") @db.VarChar(50)
+  description   String?  @db.VarChar(1000)
+  tags          String?  @db.VarChar(500)
+  imageUrl      String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
 }
 
 model ActionRequest {
