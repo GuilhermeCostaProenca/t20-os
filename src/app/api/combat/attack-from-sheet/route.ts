@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatAttackFromSheetSchema } from "@/lib/validators";
+import { appendWorldEventFromCombatEvent } from "@/lib/world-events";
 import { getRuleset } from "@/rulesets";
 import { ZodError } from "zod";
 
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
       isCrit: Boolean(toHit.isCritThreat && toHit.isNat20),
     });
 
-    await prisma.combatEvent.create({
+    const event = await prisma.combatEvent.create({
       data: {
         combatId: combat.id,
         actorName: attacker.name,
@@ -66,6 +67,11 @@ export async function POST(req: Request) {
           source: "sheet",
         },
       },
+    });
+
+    await appendWorldEventFromCombatEvent(event, {
+      campaignId: combat.campaignId,
+      combatId: combat.id,
     });
 
     return Response.json({

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatTurnSchema } from "@/lib/validators";
+import { appendWorldEventFromCombatEvent } from "@/lib/world-events";
 import { ZodError } from "zod";
 
 type Context = { params: { id: string } | Promise<{ id: string }> };
@@ -44,7 +45,7 @@ export async function POST(req: Request, { params }: Context) {
       data: { turnIndex, round },
     });
 
-    await prisma.combatEvent.create({
+    const event = await prisma.combatEvent.create({
       data: {
         combatId: combat.id,
         actorName:
@@ -55,6 +56,11 @@ export async function POST(req: Request, { params }: Context) {
         visibility: "PLAYERS",
         payloadJson: { round, turnIndex },
       },
+    });
+
+    await appendWorldEventFromCombatEvent(event, {
+      campaignId: combat.campaignId,
+      combatId: combat.id,
     });
 
     return Response.json({ data: updated });

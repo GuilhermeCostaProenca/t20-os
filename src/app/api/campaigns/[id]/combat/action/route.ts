@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatActionSchema } from "@/lib/validators";
+import { appendWorldEventFromCombatEvent } from "@/lib/world-events";
 import { rollD20, rollFormula } from "@/lib/t20/dice";
 import { clamp } from "@/lib/t20/modifiers";
 import { getRuleset } from "@/rulesets";
@@ -288,6 +289,11 @@ export async function POST(req: Request, { params }: Context) {
           conditionsApplied: conditionsToApply,
         },
       },
+    });
+
+    await appendWorldEventFromCombatEvent(event, {
+      campaignId: combat.campaignId,
+      combatId: combat.id,
     });
 
     if (conditionsToApply.length) {

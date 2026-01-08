@@ -9,7 +9,26 @@ export const CampaignCreateSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   rulesetId: z.string().trim().default("tormenta20").optional(),
+  worldId: z.string().trim().optional(),
 });
+
+export const WorldCreateSchema = z.object({
+  title: z.string().trim().min(2, "Nome precisa de pelo menos 2 caracteres"),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Descricao pode ter ate 1000 caracteres")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  coverImage: z
+    .string()
+    .trim()
+    .max(500, "URL muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+});
+
+export const WorldUpdateSchema = WorldCreateSchema.partial();
 
 export const CharacterCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome precisa de pelo menos 2 caracteres"),

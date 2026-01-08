@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatApplySchema } from "@/lib/validators";
+import { appendWorldEventFromCombatEvent } from "@/lib/world-events";
 import { ZodError } from "zod";
 
 type Context = { params: { id: string } | Promise<{ id: string }> };
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: Context) {
       data: { hpCurrent: newHp, mpCurrent: newMp },
     });
 
-    await prisma.combatEvent.create({
+    const event = await prisma.combatEvent.create({
       data: {
         combatId: combat.id,
         actorName: target.name,
@@ -64,6 +65,11 @@ export async function POST(req: Request, { params }: Context) {
           note: parsed.note,
         },
       },
+    });
+
+    await appendWorldEventFromCombatEvent(event, {
+      campaignId: combat.campaignId,
+      combatId: combat.id,
     });
 
     return Response.json({ data: updated });

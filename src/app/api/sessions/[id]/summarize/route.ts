@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { summarizeSession } from "@/lib/summarize";
+import { appendWorldEventFromSessionEvent } from "@/lib/world-events";
 import { ZodError, z } from "zod";
 
 type Context = { params: { id: string } | Promise<{ id: string }> };
@@ -30,6 +31,13 @@ export async function POST(req: Request, { params }: Context) {
         })
       : [];
 
+    const campaign = parsed.campaignId
+      ? await prisma.campaign.findUnique({
+          where: { id: parsed.campaignId },
+          select: { worldId: true },
+        })
+      : null;
+
     const summary = summarizeSession([...(combatEvents as any[]), ...((parsed.events as any[]) ?? [])]);
 
     const saved = await prisma.sessionSummary.create({
@@ -43,6 +51,17 @@ export async function POST(req: Request, { params }: Context) {
         hooks: summary.hooks,
       },
     });
+
+    const sessionEvents = (parsed.events as any[]) ?? [];
+    await Promise.all(
+      sessionEvents.map((event) =>
+        appendWorldEventFromSessionEvent(event, {
+          worldId: campaign?.worldId,
+          campaignId: parsed.campaignId,
+          sessionId: id,
+        })
+      )
+    );
 
     return Response.json({ data: saved, generated: summary });
   } catch (error) {
