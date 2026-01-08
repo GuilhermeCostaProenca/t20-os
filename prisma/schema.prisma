@@ -132,7 +132,8 @@ model CombatEvent {
   payloadJson Json
   visibility  String   @db.VarChar(12) @default("PLAYERS")
 
-  combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  combat              Combat             @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  appliedConditions   AppliedCondition[]
 
   @@index([combatId, ts])
 }
