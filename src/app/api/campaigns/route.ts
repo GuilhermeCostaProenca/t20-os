@@ -32,12 +32,14 @@ export async function GET(req: Request) {
     if (roomCode) {
       const campaign = await prisma.campaign.findUnique({
         where: { roomCode },
+        include: { world: { select: { id: true, title: true } } },
       });
       return Response.json({ data: campaign ? [campaign] : [] });
     }
 
     const campaigns = await prisma.campaign.findMany({
       orderBy: { updatedAt: "desc" },
+      include: { world: { select: { id: true, title: true } } },
     });
 
     return Response.json({ data: campaigns });
@@ -55,13 +57,36 @@ export async function POST(req: Request) {
     const rulesetId = parsed.rulesetId ?? "tormenta20";
     const roomCode = await createUniqueRoomCode();
 
+    let worldId = parsed.worldId?.trim();
+    if (worldId) {
+      const existingWorld = await prisma.world.findUnique({
+        where: { id: worldId },
+        select: { id: true },
+      });
+      if (!existingWorld) {
+        const message = "Mundo informado nao encontrado.";
+        return Response.json({ error: message, message }, { status: 400 });
+      }
+    } else {
+      const createdWorld = await prisma.world.create({
+        data: {
+          title: parsed.name,
+          description: parsed.description,
+        },
+        select: { id: true },
+      });
+      worldId = createdWorld.id;
+    }
+
     const campaign = await prisma.campaign.create({
       data: {
         name: parsed.name,
         description: parsed.description,
         rulesetId,
         roomCode,
+        worldId,
       },
+      include: { world: { select: { id: true, title: true } } },
     });
 
     return Response.json({ data: campaign }, { status: 201 });

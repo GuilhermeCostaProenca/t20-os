@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CombatConditionRemoveSchema } from "@/lib/validators";
+import { appendWorldEventFromCombatEvent } from "@/lib/world-events";
 import { ZodError } from "zod";
 
 type Context = { params: { combatId: string } | Promise<{ combatId: string }> };
@@ -95,6 +96,11 @@ export async function POST(req: Request, { params }: Context) {
           removedCount: appliedConditions.length,
         },
       },
+    });
+
+    await appendWorldEventFromCombatEvent(event, {
+      campaignId: combat.campaignId,
+      combatId: combat.id,
     });
 
     await prisma.appliedCondition.deleteMany({

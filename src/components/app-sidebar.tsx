@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpenText, LayoutDashboard, MapPin, NotebookPen, ShieldHalf, Sparkles, UserCircle2 } from "lucide-react";
+import {
+  BookOpenText,
+  Globe2,
+  LayoutDashboard,
+  MapPin,
+  NotebookPen,
+  ShieldHalf,
+  Sparkles,
+  UserCircle2,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +21,7 @@ import { Brand } from "./brand";
 
 const navItems = [
   { id: "mesa", href: "/app", label: "Mesa", icon: LayoutDashboard },
+  { id: "mundos", href: "/app/worlds", label: "Mundos", icon: Globe2 },
   { id: "personagens", href: "/app/personagens", label: "Personagens", icon: UserCircle2 },
   { id: "npcs", href: "/app/npcs", label: "NPCs", icon: ShieldHalf },
   { id: "locais", href: "/app/locais", label: "Locais", icon: MapPin },

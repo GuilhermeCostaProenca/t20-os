@@ -9,6 +9,7 @@ datasource db {
 
 model Campaign {
   id          String      @id @default(cuid())
+  worldId     String
   name        String      @db.VarChar(120)
   roomCode    String      @unique @db.VarChar(12)
   system      String      @default("TORMENTA_20") @db.VarChar(40)
@@ -17,10 +18,86 @@ model Campaign {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  world       World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
   characters  Character[]
   npcs        Npc[]
   sessions    Session[]
   combat      Combat?
+
+  @@index([worldId])
+}
+
+enum WorldStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model World {
+  id          String      @id @default(cuid())
+  title       String      @db.VarChar(200)
+  description String?     @db.VarChar(1000)
+  coverImage  String?     @db.VarChar(500)
+  status      WorldStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  campaigns   Campaign[]
+  events      WorldEvent[]
+}
+
+enum WorldEventScope {
+  MICRO
+  MACRO
+}
+
+enum WorldEventVisibility {
+  MASTER
+  PLAYERS
+}
+
+enum WorldEventType {
+  ATTACK
+  DAMAGE
+  SPELL
+  SKILL
+  NOTE
+  NPC_MENTION
+  ITEM_MENTION
+  OVERRIDE
+  TURN
+  INITIATIVE
+  SESSION_START
+  SESSION_END
+  LOCATION_DISCOVERY
+  NPC_DEATH
+  WORLD_CHANGE
+  CONDITION_APPLIED
+  CONDITION_REMOVED
+  ROLL
+}
+
+model WorldEvent {
+  id         String              @id @default(cuid())
+  worldId    String
+  campaignId String?
+  sessionId  String?
+  combatId   String?
+  type       WorldEventType
+  scope      WorldEventScope
+  ts         DateTime            @default(now())
+  actorId    String?             @db.VarChar(120)
+  targetId   String?             @db.VarChar(120)
+  visibility WorldEventVisibility @default(PLAYERS)
+  breakdown  Json?
+  meta       Json?
+  text       String?             @db.VarChar(500)
+
+  world    World     @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([worldId, ts])
+  @@index([campaignId, ts])
+  @@index([type])
 }
 
 model Character {

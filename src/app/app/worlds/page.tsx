@@ -2,9 +2,11 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Plus, Sparkles, Swords } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -21,33 +23,28 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CampaignCreateSchema } from "@/lib/validators";
+import { Textarea } from "@/components/ui/textarea";
+import { WorldCreateSchema } from "@/lib/validators";
 
-type Campaign = {
+type World = {
   id: string;
-  name: string;
+  title: string;
   description?: string | null;
-  system: string;
+  coverImage?: string | null;
   createdAt: string;
   updatedAt: string;
-  world?: {
-    id: string;
-    title: string;
-  } | null;
 };
 
 const initialForm = {
-  name: "",
+  title: "",
   description: "",
+  coverImage: "",
 };
 
-export default function DashboardPage() {
+export default function WorldsPage() {
   const router = useRouter();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [worlds, setWorlds] = useState<World[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,34 +52,34 @@ export default function DashboardPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const sortedCampaigns = useMemo(
+  const sortedWorlds = useMemo(
     () =>
-      [...campaigns].sort(
+      [...worlds].sort(
         (a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       ),
-    [campaigns]
+    [worlds]
   );
 
   useEffect(() => {
-    loadCampaigns();
+    loadWorlds();
   }, []);
 
-  async function loadCampaigns() {
+  async function loadWorlds() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/campaigns", { cache: "no-store" });
+      const res = await fetch("/api/worlds", { cache: "no-store" });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.error ?? "Não foi possível carregar campanhas");
+        throw new Error(payload.error ?? "Não foi possível carregar mundos");
       }
-      setCampaigns(payload.data ?? []);
+      setWorlds(payload.data ?? []);
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
-          : "Erro inesperado ao carregar campanhas";
+          : "Erro inesperado ao carregar mundos";
       setError(message);
     } finally {
       setLoading(false);
@@ -92,7 +89,7 @@ export default function DashboardPage() {
   async function handleCreate(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     setFormError(null);
-    const parsed = CampaignCreateSchema.safeParse(form);
+    const parsed = WorldCreateSchema.safeParse(form);
     if (!parsed.success) {
       setFormError(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
@@ -100,24 +97,24 @@ export default function DashboardPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/campaigns", {
+      const res = await fetch("/api/worlds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.error ?? "Não foi possível criar a campanha");
+        throw new Error(payload.error ?? "Não foi possível criar o mundo");
       }
 
       setForm(initialForm);
       setDialogOpen(false);
-      await loadCampaigns();
+      await loadWorlds();
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
-          : "Erro inesperado ao salvar campanha";
+          : "Erro inesperado ao salvar mundo";
       setFormError(message);
     } finally {
       setSubmitting(false);
@@ -128,24 +125,22 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.2em] text-primary">
-            Painel
-          </p>
+          <p className="text-sm uppercase tracking-[0.2em] text-primary">Mundos</p>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Campanhas</h1>
+            <h1 className="text-3xl font-bold">Universos vivos</h1>
             <Badge className="border-primary/30 bg-primary/10 text-primary">
-              Tormenta 20
+              World
             </Badge>
           </div>
           <p className="text-muted-foreground">
-            Crie, organize e navegue entre suas campanhas da mesa.
+            Gerencie os mundos canônicos e acompanhe campanhas e eventos.
           </p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             className="border-primary/30 bg-white/5 text-primary"
-            onClick={loadCampaigns}
+            onClick={loadWorlds}
             disabled={loading}
           >
             <Sparkles className="h-4 w-4" />
@@ -155,50 +150,58 @@ export default function DashboardPage() {
             <DialogTrigger asChild>
               <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
                 <Plus className="h-4 w-4" />
-                Nova campanha
+                Novo mundo
               </Button>
             </DialogTrigger>
             <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
               <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-                <DialogTitle>Nova campanha</DialogTitle>
+                <DialogTitle>Novo mundo</DialogTitle>
                 <DialogDescription>
-                  Defina um nome épico e uma descrição curta. Validamos os
-                  campos automaticamente.
+                  Crie um universo base para suas campanhas e eventos.
                 </DialogDescription>
               </DialogHeader>
               <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreate}>
                 <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
                   <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Nome
-                  </label>
-                  <Input
-                    placeholder="Ex.: Fortaleza de Valkaria"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Descrição
-                  </label>
-                  <Textarea
-                    placeholder="Breve contexto da campanha"
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    rows={4}
-                  />
-                </div>
-                {formError ? (
-                  <p className="text-sm text-destructive">{formError}</p>
-                ) : null}
+                    <label className="text-sm font-medium text-foreground">Nome</label>
+                    <Input
+                      placeholder="Ex.: Atlas de Arton"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, title: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Descrição</label>
+                    <Textarea
+                      placeholder="Breve resumo do mundo"
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Cover URL</label>
+                    <Input
+                      placeholder="Opcional: https://"
+                      value={form.coverImage}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          coverImage: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  {formError ? (
+                    <p className="text-sm text-destructive">{formError}</p>
+                  ) : null}
                 </div>
                 <div className="shrink-0 border-t border-white/10 px-6 py-4">
                   <div className="flex justify-end gap-2">
@@ -216,7 +219,7 @@ export default function DashboardPage() {
                       disabled={submitting}
                       className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
                     >
-                      {submitting ? "Salvando..." : "Criar campanha"}
+                      {submitting ? "Salvando..." : "Criar mundo"}
                     </Button>
                   </div>
                 </div>
@@ -242,57 +245,51 @@ export default function DashboardPage() {
           title="Falha ao carregar"
           description={error}
           action={
-            <Button onClick={loadCampaigns} className="shadow-[0_0_18px_rgba(226,69,69,0.3)]">
+            <Button
+              onClick={loadWorlds}
+              className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
+            >
               Tentar novamente
             </Button>
           }
-          icon={<Swords className="h-6 w-6" />}
         />
-      ) : sortedCampaigns.length === 0 ? (
+      ) : sortedWorlds.length === 0 ? (
         <EmptyState
-          title="Nenhuma campanha ainda"
-          description="Crie sua primeira campanha e comece a operar sua mesa."
+          title="Nenhum mundo ainda"
+          description="Crie um mundo base para organizar campanhas e eventos."
           action={
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4" />
-              Nova campanha
+              Novo mundo
             </Button>
           }
-          icon={<Swords className="h-6 w-6" />}
         />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sortedCampaigns.map((campaign) => (
+          {sortedWorlds.map((world) => (
             <Card
-              key={campaign.id}
+              key={world.id}
               className="chrome-panel group relative cursor-pointer rounded-2xl border-white/10 bg-white/5 transition duration-150 hover:-translate-y-1 hover:border-primary/25"
-              onClick={() => router.push(`/app/campaign/${campaign.id}`)}
+              onClick={() => router.push(`/app/worlds/${world.id}`)}
             >
               <CardHeader className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Badge className="border-primary/25 bg-primary/10 text-primary">
-                    {campaign.system}
+                    Mundo
                   </Badge>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
+                  <span className="text-xs text-muted-foreground">
+                    Atualizado {new Date(world.updatedAt).toLocaleDateString("pt-BR")}
+                  </span>
                 </div>
                 <CardTitle className="text-lg font-semibold">
-                  {campaign.name}
+                  {world.title}
                 </CardTitle>
                 <CardDescription className="line-clamp-2">
-                  {campaign.description || "Sem descrição no momento."}
+                  {world.description || "Sem descrição no momento."}
                 </CardDescription>
-                {campaign.world?.title ? (
-                  <Badge className="w-fit border-white/10 bg-white/5 text-xs text-muted-foreground">
-                    Mundo: {campaign.world.title}
-                  </Badge>
-                ) : null}
               </CardHeader>
-              <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Atualizada {new Date(campaign.updatedAt).toLocaleDateString("pt-BR")}</span>
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_rgba(226,69,69,0.5)]" />
-                  Pronta
-                </span>
+              <CardContent className="text-sm text-muted-foreground">
+                {world.coverImage ? "Capa definida" : "Sem capa"}
               </CardContent>
             </Card>
           ))}
