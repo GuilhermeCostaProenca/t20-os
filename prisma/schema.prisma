@@ -23,6 +23,7 @@ model Campaign {
   npcs        Npc[]
   sessions    Session[]
   combat      Combat?
+  worldEvents WorldEvent[]
 
   @@index([worldId])
 }
