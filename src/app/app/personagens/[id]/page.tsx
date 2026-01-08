@@ -4,7 +4,7 @@ import { getRuleset } from "@/rulesets";
 import { notFound } from "next/navigation";
 
 type PageProps = {
-  params: { id: string };
+  params: { id: string } | Promise<{ id: string }>;
 };
 
 async function getData(id: string) {
@@ -65,7 +65,9 @@ async function getData(id: string) {
 }
 
 export default async function CharacterSheetPage({ params }: PageProps) {
-  const data = await getData(params.id);
+  const resolvedParams = await Promise.resolve(params);
+  if (!resolvedParams?.id) return notFound();
+  const data = await getData(resolvedParams.id);
   if (!data) return notFound();
   const { character, sheet } = data;
 

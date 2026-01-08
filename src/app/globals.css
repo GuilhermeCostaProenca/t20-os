@@ -219,6 +219,10 @@ body::after {
     opacity: 0.6;
   }
 
+  .chrome-panel[data-slot="dialog-content"] {
+    position: fixed;
+  }
+
   .glow-ring {
     box-shadow:
       0 0 0 1px rgba(226, 69, 69, 0.25),
