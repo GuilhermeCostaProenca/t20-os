@@ -13,6 +13,18 @@ export const CampaignCreateSchema = z.object({
 
 export const CharacterCreateSchema = z.object({
   name: z.string().trim().min(2, "Nome precisa de pelo menos 2 caracteres"),
+  ancestry: z
+    .string()
+    .trim()
+    .max(120, "Raca muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  className: z
+    .string()
+    .trim()
+    .max(120, "Classe muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   role: z
     .string()
     .trim()

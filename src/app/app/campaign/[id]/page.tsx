@@ -56,6 +56,8 @@ type Character = {
   id: string;
   campaignId: string;
   name: string;
+  ancestry?: string | null;
+  className?: string | null;
   role?: string | null;
   description?: string | null;
   avatarUrl?: string | null;
@@ -77,6 +79,8 @@ type Session = {
 
 const initialCharacter = {
   name: "",
+  ancestry: "",
+  className: "",
   role: "",
   description: "",
   avatarUrl: "",
@@ -243,6 +247,8 @@ export default function CampaignPage() {
     setEditingCharacter(character);
     setForm({
       name: character.name ?? "",
+      ancestry: character.ancestry ?? "",
+      className: character.className ?? "",
       role: character.role ?? "",
       description: character.description ?? "",
       avatarUrl: character.avatarUrl ?? "",
@@ -540,7 +546,7 @@ export default function CampaignPage() {
                     {editingCharacter ? "Editar personagem" : "Novo personagem"}
                   </DialogTitle>
                   <DialogDescription>
-                    Nome, funcao curta e nivel (1 a 20) com validacao direta.
+                    Nome, raca, classe e nivel (1 a 20) com validacao direta.
                   </DialogDescription>
                 </DialogHeader>
                 <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSaveCharacter}>
@@ -556,6 +562,32 @@ export default function CampaignPage() {
                         }
                         placeholder="Artoniano lendario"
                       />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Raca
+                        </label>
+                        <Input
+                          value={form.ancestry ?? ""}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, ancestry: e.target.value }))
+                          }
+                          placeholder="Humano, elfo, etc."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Classe
+                        </label>
+                        <Input
+                          value={form.className ?? ""}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, className: e.target.value }))
+                          }
+                          placeholder="Guerreiro, mago, etc."
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">

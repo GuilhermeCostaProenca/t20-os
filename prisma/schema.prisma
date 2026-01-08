@@ -26,6 +26,8 @@ model Character {
   id         String    @id @default(cuid())
   campaignId String
   name       String    @db.VarChar(120)
+  ancestry   String?   @db.VarChar(120)
+  className  String?   @db.VarChar(120)
   role       String?   @db.VarChar(120)
   description String?  @db.VarChar(500)
   avatarUrl  String?   @db.VarChar(500)

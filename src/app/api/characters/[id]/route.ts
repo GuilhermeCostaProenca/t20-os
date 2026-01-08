@@ -30,6 +30,8 @@ export async function PUT(req: Request, { params }: Context) {
       where: { id },
       data: {
         name: parsed.name,
+        ancestry: parsed.ancestry ?? null,
+        className: parsed.className ?? null,
         role: parsed.role,
         description: parsed.description ?? null,
         avatarUrl: parsed.avatarUrl ?? null,

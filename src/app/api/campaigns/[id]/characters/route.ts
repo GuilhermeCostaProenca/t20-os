@@ -62,6 +62,8 @@ export async function POST(req: Request, { params }: RouteContext) {
     const character = await prisma.character.create({
       data: {
         name: parsed.name,
+        ancestry: parsed.ancestry,
+        className: parsed.className,
         role: parsed.role,
         description: parsed.description,
         avatarUrl: parsed.avatarUrl,
