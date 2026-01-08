@@ -18,6 +18,7 @@ model Campaign {
   updatedAt   DateTime    @updatedAt
 
   characters  Character[]
+  sessions    Session[]
   combat      Combat?
 }
 
@@ -203,6 +204,21 @@ model SessionSummary {
 
   @@index([sessionId])
   @@index([campaignId, createdAt])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  campaignId  String
+  title       String   @db.VarChar(200)
+  description String?  @db.VarChar(1000)
+  coverUrl    String?  @db.VarChar(500)
+  scheduledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, scheduledAt])
 }
 
 model ActionRequest {

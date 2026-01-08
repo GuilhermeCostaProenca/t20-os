@@ -180,6 +180,25 @@ export const CombatTurnSchema = z.object({
   direction: z.enum(["next", "prev"]).default("next"),
 });
 
+export const SessionCreateSchema = z.object({
+  title: z.string().trim().min(2, "Titulo precisa de pelo menos 2 caracteres"),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Descricao pode ter ate 1000 caracteres")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  scheduledAt: z.string().datetime().optional(),
+  coverUrl: z
+    .string()
+    .trim()
+    .max(500, "URL muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+});
+
+export const SessionUpdateSchema = SessionCreateSchema;
+
 const CombatActionTypeSchema = z.enum(["ATTACK", "SPELL", "SKILL"]);
 
 export const CombatActionSchema = z

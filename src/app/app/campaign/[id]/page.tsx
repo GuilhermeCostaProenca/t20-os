@@ -38,7 +38,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { CharacterCreateSchema } from "@/lib/validators";
+import { CharacterCreateSchema, SessionCreateSchema } from "@/lib/validators";
 import { Textarea } from "@/components/ui/textarea";
 import { CombatPanel } from "@/components/combat/combat-panel";
 
@@ -64,6 +64,17 @@ type Character = {
   updatedAt: string;
 };
 
+type Session = {
+  id: string;
+  campaignId: string;
+  title: string;
+  description?: string | null;
+  coverUrl?: string | null;
+  scheduledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const initialCharacter = {
   name: "",
   role: "",
@@ -72,12 +83,33 @@ const initialCharacter = {
   level: 1,
 };
 
+function toDatetimeLocal(value: string | Date | null | undefined) {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (num: number) => String(num).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+const initialSession = {
+  title: "",
+  description: "",
+  scheduledAt: toDatetimeLocal(new Date()),
+  coverUrl: "",
+};
+
 export default function CampaignPage() {
   const params = useParams<{ id: string }>();
   const campaignId = params?.id;
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,6 +118,12 @@ export default function CampaignPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [sessionForm, setSessionForm] = useState(initialSession);
+  const [sessionFormError, setSessionFormError] = useState<string | null>(null);
+  const [sessionUploading, setSessionUploading] = useState(false);
+  const [sessionSubmitting, setSessionSubmitting] = useState(false);
 
   const sortedCharacters = useMemo(
     () =>
@@ -94,6 +132,16 @@ export default function CampaignPage() {
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       ),
     [characters]
+  );
+
+  const sortedSessions = useMemo(
+    () =>
+      [...sessions].sort((a, b) => {
+        const aDate = new Date(a.scheduledAt ?? a.updatedAt).getTime();
+        const bDate = new Date(b.scheduledAt ?? b.updatedAt).getTime();
+        return bDate - aDate;
+      }),
+    [sessions]
   );
 
   useEffect(() => {
@@ -106,9 +154,10 @@ export default function CampaignPage() {
     setLoading(true);
     setError(null);
     try {
-      const [campaignRes, characterRes] = await Promise.all([
+      const [campaignRes, characterRes, sessionRes] = await Promise.all([
         fetch("/api/campaigns", { cache: "no-store" }),
         fetch(`/api/campaigns/${id}/characters`, { cache: "no-store" }),
+        fetch(`/api/campaigns/${id}/sessions`, { cache: "no-store" }),
       ]);
 
       const campaignPayload = await campaignRes.json();
@@ -128,6 +177,12 @@ export default function CampaignPage() {
         throw new Error(characterPayload.error ?? "Erro ao buscar personagens");
       }
       setCharacters(characterPayload.data ?? []);
+
+      const sessionPayload = await sessionRes.json();
+      if (!sessionRes.ok) {
+        throw new Error(sessionPayload.error ?? "Erro ao buscar sessoes");
+      }
+      setSessions(sessionPayload.data ?? []);
 
     } catch (err) {
       const message =
@@ -160,6 +215,20 @@ export default function CampaignPage() {
       setFormError(message);
     } finally {
       setAvatarUploading(false);
+    }
+  }
+
+  async function handleCoverUpload(file: File) {
+    setSessionFormError(null);
+    setSessionUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setSessionForm((prev) => ({ ...prev, coverUrl: url }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao enviar imagem";
+      setSessionFormError(message);
+    } finally {
+      setSessionUploading(false);
     }
   }
 
@@ -245,6 +314,102 @@ export default function CampaignPage() {
       const message = err instanceof Error ? err.message : "Erro ao remover personagem";
       if (typeof window !== "undefined") window.alert(message);
     }
+  }
+
+  function openCreateSession() {
+    setEditingSession(null);
+    setSessionForm({ ...initialSession, scheduledAt: toDatetimeLocal(new Date()) });
+    setSessionFormError(null);
+    setSessionDialogOpen(true);
+  }
+
+  function openEditSession(session: Session) {
+    setEditingSession(session);
+    setSessionForm({
+      title: session.title ?? "",
+      description: session.description ?? "",
+      scheduledAt: toDatetimeLocal(session.scheduledAt),
+      coverUrl: session.coverUrl ?? "",
+    });
+    setSessionFormError(null);
+    setSessionDialogOpen(true);
+  }
+
+  async function handleSaveSession(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setSessionFormError(null);
+    const scheduledAt = sessionForm.scheduledAt ? new Date(sessionForm.scheduledAt) : null;
+    if (sessionForm.scheduledAt && Number.isNaN(scheduledAt?.getTime())) {
+      setSessionFormError("Data invalida");
+      return;
+    }
+    const parsed = SessionCreateSchema.safeParse({
+      title: sessionForm.title,
+      description: sessionForm.description,
+      scheduledAt: scheduledAt ? scheduledAt.toISOString() : undefined,
+      coverUrl: sessionForm.coverUrl,
+    });
+    if (!parsed.success) {
+      setSessionFormError(parsed.error.issues[0]?.message ?? "Dados invalidos");
+      return;
+    }
+    if (!campaignId) {
+      setSessionFormError("Campanha invalida");
+      return;
+    }
+
+    setSessionSubmitting(true);
+    try {
+      const endpoint = editingSession
+        ? `/api/sessions/${editingSession.id}`
+        : `/api/campaigns/${campaignId}/sessions`;
+      const res = await fetch(endpoint, {
+        method: editingSession ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Erro ao salvar sessao");
+      }
+
+      const saved: Session = payload.data ?? payload;
+      setSessions((prev) =>
+        editingSession ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
+      );
+      setSessionDialogOpen(false);
+      setEditingSession(null);
+      setSessionForm(initialSession);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro inesperado ao salvar sessao";
+      setSessionFormError(message);
+    } finally {
+      setSessionSubmitting(false);
+    }
+  }
+
+  async function handleDeleteSession(session: Session) {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(`Remover sessao "${session.title}"?`);
+      if (!ok) return;
+    }
+    try {
+      const res = await fetch(`/api/sessions/${session.id}`, { method: "DELETE" });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Erro ao remover sessao");
+      }
+      setSessions((prev) => prev.filter((item) => item.id !== session.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao remover sessao";
+      if (typeof window !== "undefined") window.alert(message);
+    }
+  }
+
+  function openSessionMode(session: Session) {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("t20-session-id", session.id);
+    window.dispatchEvent(new CustomEvent("t20-open-session"));
   }
 
   const loadingState = loading || !campaignId;
@@ -616,12 +781,215 @@ export default function CampaignPage() {
           />
         </TabsContent>
 
-        <TabsContent value="sessions">
-          <EmptyState
-            title="Sessoes em construcao"
-            description="Log de sessao, cronologia e notas rapidas ficam prontos na proxima entrega."
-            icon={<Swords className="h-6 w-6" />}
-          />
+                <TabsContent value="sessions" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">Sessoes</h3>
+              <p className="text-sm text-muted-foreground">
+                Organize os encontros e abra o Modo Sessao quando precisar.
+              </p>
+            </div>
+            <Dialog
+              open={sessionDialogOpen}
+              onOpenChange={(open) => {
+                setSessionDialogOpen(open);
+                if (!open) {
+                  setEditingSession(null);
+                  setSessionFormError(null);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button
+                  className="shadow-[0_0_24px_rgba(226,69,69,0.35)]"
+                  onClick={openCreateSession}
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova sessao
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
+                <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+                  <DialogTitle>
+                    {editingSession ? "Editar sessao" : "Nova sessao"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Defina titulo, descricao, data e capa opcional.
+                  </DialogDescription>
+                </DialogHeader>
+                <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSaveSession}>
+                  <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Titulo
+                      </label>
+                      <Input
+                        value={sessionForm.title}
+                        onChange={(e) =>
+                          setSessionForm((prev) => ({ ...prev, title: e.target.value }))
+                        }
+                        placeholder="Sessao 12 - Fortaleza"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Resumo
+                      </label>
+                      <Textarea
+                        value={sessionForm.description ?? ""}
+                        onChange={(e) =>
+                          setSessionForm((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        rows={3}
+                        placeholder="Resumo rapido do encontro"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Data / hora
+                      </label>
+                      <Input
+                        type="datetime-local"
+                        value={sessionForm.scheduledAt}
+                        onChange={(e) =>
+                          setSessionForm((prev) => ({ ...prev, scheduledAt: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Capa (opcional)
+                      </label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        disabled={sessionUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            void handleCoverUpload(file);
+                          }
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                      {sessionForm.coverUrl ? (
+                        <div className="space-y-2">
+                          <img
+                            src={sessionForm.coverUrl}
+                            alt={sessionForm.title || "Capa da sessao"}
+                            className="h-32 w-full rounded-lg border border-white/10 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setSessionForm((prev) => ({ ...prev, coverUrl: "" }))
+                            }
+                          >
+                            Remover imagem
+                          </Button>
+                        </div>
+                      ) : null}
+                      {sessionUploading ? (
+                        <p className="text-xs text-muted-foreground">Enviando imagem...</p>
+                      ) : null}
+                    </div>
+                    {sessionFormError ? (
+                      <p className="text-sm text-destructive">{sessionFormError}</p>
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 border-t border-white/10 px-6 py-4">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        className="text-muted-foreground"
+                        onClick={() => setSessionDialogOpen(false)}
+                        disabled={sessionSubmitting}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={sessionSubmitting || sessionUploading}
+                        className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
+                      >
+                        {sessionSubmitting
+                          ? "Salvando..."
+                          : editingSession
+                          ? "Salvar"
+                          : "Criar sessao"}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {sortedSessions.length === 0 ? (
+            <EmptyState
+              title="Nenhuma sessao ainda"
+              description="Crie sessoes para organizar o log e abrir o modo ao vivo."
+              action={
+                <Button onClick={openCreateSession}>
+                  <Plus className="h-4 w-4" />
+                  Nova sessao
+                </Button>
+              }
+              icon={<Swords className="h-6 w-6" />}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {sortedSessions.map((session) => {
+                const displayDate = new Date(
+                  session.scheduledAt ?? session.updatedAt
+                ).toLocaleString("pt-BR");
+                return (
+                  <Card
+                    key={session.id}
+                    className="chrome-panel rounded-2xl border-white/10 bg-white/5"
+                  >
+                    {session.coverUrl ? (
+                      <img
+                        src={session.coverUrl}
+                        alt={session.title}
+                        className="h-36 w-full rounded-t-2xl border-b border-white/10 object-cover"
+                      />
+                    ) : null}
+                    <CardHeader className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-lg">{session.title}</CardTitle>
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {displayDate}
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {session.description || "Sem descricao registrada."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => openSessionMode(session)}>
+                        Abrir no Modo Sessao
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openEditSession(session)}>
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => void handleDeleteSession(session)}
+                      >
+                        Apagar
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="combat">

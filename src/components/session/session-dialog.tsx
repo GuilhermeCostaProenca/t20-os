@@ -81,6 +81,13 @@ export function SessionDialog() {
     if (!stored) localStorage.setItem("t20-room-code", code);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOpen = () => setOpen(true);
+    window.addEventListener("t20-open-session", handleOpen as EventListener);
+    return () => window.removeEventListener("t20-open-session", handleOpen as EventListener);
+  }, []);
+
   const roomLink =
     typeof window !== "undefined" && roomCode ? `${window.location.origin}/play/${roomCode}` : "";
 

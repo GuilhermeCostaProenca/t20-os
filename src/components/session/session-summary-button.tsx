@@ -21,8 +21,22 @@ export function SessionSummaryButton() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setSessionId(defaultSessionId());
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("t20-session-id");
+    setSessionId(stored || defaultSessionId());
+    const handleOpen = () => {
+      const next = localStorage.getItem("t20-session-id");
+      if (next) setSessionId(next);
+    };
+    window.addEventListener("t20-open-session", handleOpen as EventListener);
+    return () => window.removeEventListener("t20-open-session", handleOpen as EventListener);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!sessionId.trim()) return;
+    localStorage.setItem("t20-session-id", sessionId.trim());
+  }, [sessionId]);
 
   const eventsPayload = useMemo(
     () =>
