@@ -2,13 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { WorldUpdateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+type Context = { params: { id: string } | Promise<{ id: string }> };
 
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
+
+export async function GET(_req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const world = await prisma.world.findUnique({
       where: { id },
       include: {
@@ -32,13 +37,11 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
-
+export async function PUT(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const payload = await req.json();
     const parsed = WorldUpdateSchema.parse(payload);
 
@@ -64,13 +67,11 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
-
+export async function DELETE(_req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     await prisma.world.delete({ where: { id } });
     return Response.json({ ok: true });
   } catch (error) {

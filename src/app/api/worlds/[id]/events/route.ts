@@ -4,13 +4,18 @@ import { WorldEventScope, WorldEventType } from "@prisma/client";
 const worldEventTypes = new Set(Object.values(WorldEventType));
 const worldEventScopes = new Set(Object.values(WorldEventScope));
 
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+type Context = { params: { id: string } | Promise<{ id: string }> };
 
+function missingId() {
+  const message = "Parametro id obrigatorio.";
+  return Response.json({ error: message, message }, { status: 400 });
+}
+
+export async function GET(req: Request, { params }: Context) {
+  let id = "";
   try {
+    ({ id } = await Promise.resolve(params));
+    if (!id) return missingId();
     const { searchParams } = new URL(req.url);
     const scope = searchParams.get("scope")?.toUpperCase();
     const type = searchParams.get("type")?.toUpperCase();
