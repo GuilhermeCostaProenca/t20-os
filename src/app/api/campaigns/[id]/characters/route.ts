@@ -3,13 +3,15 @@ import { CharacterCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
 type RouteContext = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(_req: Request, { params }: RouteContext) {
+  let id = "";
   try {
+    ({ id } = await params);
     const campaign = await prisma.campaign.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true },
     });
 
@@ -21,13 +23,13 @@ export async function GET(_req: Request, { params }: RouteContext) {
     }
 
     const characters = await prisma.character.findMany({
-      where: { campaignId: params.id },
+      where: { campaignId: id },
       orderBy: { updatedAt: "desc" },
     });
 
     return Response.json({ data: characters });
   } catch (error) {
-    console.error(`GET /api/campaigns/${params.id}/characters`, error);
+    console.error(`GET /api/campaigns/${id || "unknown"}/characters`, error);
     return Response.json(
       { error: "Não foi possível listar personagens." },
       { status: 500 }
@@ -36,12 +38,14 @@ export async function GET(_req: Request, { params }: RouteContext) {
 }
 
 export async function POST(req: Request, { params }: RouteContext) {
+  let id = "";
   try {
+    ({ id } = await params);
     const payload = await req.json();
     const parsed = CharacterCreateSchema.parse(payload);
 
     const campaign = await prisma.campaign.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true },
     });
 
@@ -56,8 +60,10 @@ export async function POST(req: Request, { params }: RouteContext) {
       data: {
         name: parsed.name,
         role: parsed.role,
+        description: parsed.description,
+        avatarUrl: parsed.avatarUrl,
         level: parsed.level,
-        campaignId: params.id,
+        campaignId: id,
       },
     });
 
@@ -70,7 +76,7 @@ export async function POST(req: Request, { params }: RouteContext) {
       );
     }
 
-    console.error(`POST /api/campaigns/${params.id}/characters`, error);
+    console.error(`POST /api/campaigns/${id || "unknown"}/characters`, error);
     return Response.json(
       { error: "Não foi possível criar o personagem." },
       { status: 500 }

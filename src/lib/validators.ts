@@ -19,12 +19,26 @@ export const CharacterCreateSchema = z.object({
     .max(120, "Funcao curta, por favor")
     .optional()
     .or(z.literal("").transform(() => undefined)),
+  description: z
+    .string()
+    .trim()
+    .max(500, "Descricao pode ter ate 500 caracteres")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  avatarUrl: z
+    .string()
+    .trim()
+    .max(500, "URL muito longa")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   level: z
     .coerce.number()
     .int("Nivel deve ser um numero inteiro")
     .min(1, "Nivel minimo e 1")
     .max(20, "Nivel maximo e 20"),
 });
+
+export const CharacterUpdateSchema = CharacterCreateSchema;
 
 export const RevealCreateSchema = z.object({
   roomCode: z.string().trim().min(4).max(12),

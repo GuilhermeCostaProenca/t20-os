@@ -57,6 +57,8 @@ type Character = {
   campaignId: string;
   name: string;
   role?: string | null;
+  description?: string | null;
+  avatarUrl?: string | null;
   level: number;
   createdAt: string;
   updatedAt: string;
@@ -65,6 +67,8 @@ type Character = {
 const initialCharacter = {
   name: "",
   role: "",
+  description: "",
+  avatarUrl: "",
   level: 1,
 };
 
@@ -77,8 +81,10 @@ export default function CampaignPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
   const [form, setForm] = useState(initialCharacter);
   const [formError, setFormError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const sortedCharacters = useMemo(
@@ -122,6 +128,7 @@ export default function CampaignPage() {
         throw new Error(characterPayload.error ?? "Erro ao buscar personagens");
       }
       setCharacters(characterPayload.data ?? []);
+
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Erro inesperado ao carregar";
@@ -131,43 +138,112 @@ export default function CampaignPage() {
     }
   }
 
-  async function handleCreateCharacter(event?: FormEvent<HTMLFormElement>) {
+  async function uploadImage(file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.error ?? "Falha ao enviar imagem");
+    }
+    return payload.url as string;
+  }
+
+  async function handleAvatarUpload(file: File) {
+    setFormError(null);
+    setAvatarUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm((prev) => ({ ...prev, avatarUrl: url }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao enviar avatar";
+      setFormError(message);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  function openCreateCharacter() {
+    setEditingCharacter(null);
+    setForm(initialCharacter);
+    setFormError(null);
+    setDialogOpen(true);
+  }
+
+  function openEditCharacter(character: Character) {
+    setEditingCharacter(character);
+    setForm({
+      name: character.name ?? "",
+      role: character.role ?? "",
+      description: character.description ?? "",
+      avatarUrl: character.avatarUrl ?? "",
+      level: character.level ?? 1,
+    });
+    setFormError(null);
+    setDialogOpen(true);
+  }
+
+  async function handleSaveCharacter(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     setFormError(null);
     const parsed = CharacterCreateSchema.safeParse(form);
     if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "Dados inválidos");
+      setFormError(parsed.error.issues[0]?.message ?? "Dados invalidos");
       return;
     }
     if (!campaignId) {
-      setFormError("Campanha inválida");
+      setFormError("Campanha invalida");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/campaigns/${campaignId}/characters`, {
-        method: "POST",
+      const endpoint = editingCharacter
+        ? `/api/characters/${editingCharacter.id}`
+        : `/api/campaigns/${campaignId}/characters`;
+      const res = await fetch(endpoint, {
+        method: editingCharacter ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.error ?? "Erro ao criar personagem");
+        throw new Error(payload.error ?? "Erro ao salvar personagem");
       }
 
-      const created: Character = payload.data ?? payload;
-      setCharacters((prev) => [created, ...prev]);
+      const saved: Character = payload.data ?? payload;
+      setCharacters((prev) =>
+        editingCharacter ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
+      );
       setDialogOpen(false);
+      setEditingCharacter(null);
       setForm(initialCharacter);
     } catch (err) {
       const message =
         err instanceof Error
           ? err.message
-          : "Erro inesperado ao criar personagem";
+          : "Erro inesperado ao salvar personagem";
       setFormError(message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteCharacter(character: Character) {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(`Remover personagem "${character.name}"?`);
+      if (!ok) return;
+    }
+    try {
+      const res = await fetch(`/api/characters/${character.id}`, { method: "DELETE" });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Erro ao remover personagem");
+      }
+      setCharacters((prev) => prev.filter((item) => item.id !== character.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao remover personagem";
+      if (typeof window !== "undefined") window.alert(message);
     }
   }
 
@@ -274,66 +350,133 @@ export default function CampaignPage() {
             <TabsTrigger value="combat">Combate</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) {
+                  setEditingCharacter(null);
+                  setFormError(null);
+                }
+              }}
+            >
               <DialogTrigger asChild>
-                <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
+                <Button
+                  className="shadow-[0_0_24px_rgba(226,69,69,0.35)]"
+                  onClick={openCreateCharacter}
+                >
                   <Plus className="h-4 w-4" />
                   Novo personagem
                 </Button>
               </DialogTrigger>
               <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-                  <DialogTitle>Novo personagem</DialogTitle>
+                  <DialogTitle>
+                    {editingCharacter ? "Editar personagem" : "Novo personagem"}
+                  </DialogTitle>
                   <DialogDescription>
-                    Nome, função curta e nível (1 a 20) com validação direta.
+                    Nome, funcao curta e nivel (1 a 20) com validacao direta.
                   </DialogDescription>
                 </DialogHeader>
-                <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreateCharacter}>
+                <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSaveCharacter}>
                   <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
                     <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Nome
-                    </label>
-                    <Input
-                      value={form.name}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, name: e.target.value }))
-                      }
-                      placeholder="Artoniano lendário"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Papel
-                    </label>
-                    <Input
-                      value={form.role ?? ""}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, role: e.target.value }))
-                      }
-                      placeholder="Guerreiro, Mago, etc."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Nível
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={form.level}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          level: Number(e.target.value) || 1,
-                        }))
-                      }
-                    />
-                  </div>
-                  {formError ? (
-                    <p className="text-sm text-destructive">{formError}</p>
-                  ) : null}
+                      <label className="text-sm font-medium text-foreground">
+                        Nome
+                      </label>
+                      <Input
+                        value={form.name}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, name: e.target.value }))
+                        }
+                        placeholder="Artoniano lendario"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Papel
+                      </label>
+                      <Input
+                        value={form.role ?? ""}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, role: e.target.value }))
+                        }
+                        placeholder="Guerreiro, Mago, etc."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Nivel
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={form.level}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            level: Number(e.target.value) || 1,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Descricao curta
+                      </label>
+                      <Textarea
+                        value={form.description ?? ""}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                        placeholder="Resumo rapido do personagem"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        Avatar (opcional)
+                      </label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        disabled={avatarUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            void handleAvatarUpload(file);
+                          }
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                      {form.avatarUrl ? (
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={form.avatarUrl}
+                            alt={form.name || "Avatar"}
+                            className="h-12 w-12 rounded-full border border-white/10 object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setForm((prev) => ({ ...prev, avatarUrl: "" }))}
+                          >
+                            Remover imagem
+                          </Button>
+                        </div>
+                      ) : null}
+                      {avatarUploading ? (
+                        <p className="text-xs text-muted-foreground">Enviando imagem...</p>
+                      ) : null}
+                    </div>
+                    {formError ? (
+                      <p className="text-sm text-destructive">{formError}</p>
+                    ) : null}
                   </div>
                   <div className="shrink-0 border-t border-white/10 px-6 py-4">
                     <div className="flex justify-end gap-2">
@@ -348,10 +491,14 @@ export default function CampaignPage() {
                       </Button>
                       <Button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || avatarUploading}
                         className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
                       >
-                        {submitting ? "Salvando..." : "Criar personagem"}
+                        {submitting
+                          ? "Salvando..."
+                          : editingCharacter
+                          ? "Salvar"
+                          : "Criar personagem"}
                       </Button>
                     </div>
                   </div>
@@ -367,7 +514,7 @@ export default function CampaignPage() {
               title="Nenhum personagem ainda"
               description="Cadastre fichas para este grupo e acompanhe tudo em um só lugar."
               action={
-                <Button onClick={() => setDialogOpen(true)}>
+                <Button onClick={openCreateCharacter}>
                   <Plus className="h-4 w-4" />
                   Novo personagem
                 </Button>
@@ -384,22 +531,67 @@ export default function CampaignPage() {
                 >
                   <Card className="chrome-panel group rounded-2xl border-white/10 bg-white/5 transition duration-150 hover:-translate-y-1 hover:border-primary/25">
                     <CardHeader className="flex flex-row items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <CardTitle className="text-lg">{character.name}</CardTitle>
-                        <CardDescription>
-                          {character.role || "Sem papel definido"}
-                        </CardDescription>
+                      <div className="flex items-start gap-3">
+                        {character.avatarUrl ? (
+                          <img
+                            src={character.avatarUrl}
+                            alt={character.name}
+                            className="h-12 w-12 rounded-full border border-white/10 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-muted-foreground">
+                            {character.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <CardTitle className="text-lg">{character.name}</CardTitle>
+                          <CardDescription>
+                            {character.role || "Sem papel definido"}
+                          </CardDescription>
+                          {character.description ? (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {character.description}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                       <Badge className="border-primary/30 bg-primary/10 text-primary">
-                        N?vel {character.level}
+                        Nivel {character.level}
                       </Badge>
                     </CardHeader>
-                    <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>
-                        Atualizado{" "}
-                        {new Date(character.updatedAt).toLocaleDateString("pt-BR")}
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          Atualizado{" "}
+                          {new Date(character.updatedAt).toLocaleDateString("pt-BR")}
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openEditCharacter(character);
+                          }}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleDeleteCharacter(character);
+                          }}
+                        >
+                          Apagar
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 </Link>
@@ -426,8 +618,8 @@ export default function CampaignPage() {
 
         <TabsContent value="sessions">
           <EmptyState
-            title="Sessões em construção"
-            description="Log de sessão, cronologia e notas rápidas ficam prontos na próxima entrega."
+            title="Sessoes em construcao"
+            description="Log de sessao, cronologia e notas rapidas ficam prontos na proxima entrega."
             icon={<Swords className="h-6 w-6" />}
           />
         </TabsContent>
