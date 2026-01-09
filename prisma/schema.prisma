@@ -15,6 +15,7 @@ model Campaign {
   system      String   @default("TORMENTA_20") @db.VarChar(40)
   rulesetId   String   @default("tormenta20") @db.VarChar(50)
   description String?  @db.VarChar(500)
+  status      String   @default("ACTIVE") @db.VarChar(12) // ACTIVE, ARCHIVED, DELETED
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -31,10 +32,31 @@ model Campaign {
 enum WorldStatus {
   ACTIVE
   ARCHIVED
+  DELETED
+}
+
+enum WorldMemberRole {
+  GM
+  PLAYER
+  SPECTATOR
+}
+
+model WorldMember {
+  id        String          @id @default(cuid())
+  worldId   String
+  userId    String          @db.VarChar(120) // Clerk/Auth ID
+  role      WorldMemberRole @default(PLAYER)
+  createdAt DateTime        @default(now())
+  
+  world     World           @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, userId])
+  @@index([userId])
 }
 
 model World {
   id          String      @id @default(cuid())
+  ownerId     String?     @db.VarChar(120) // Creator/Owner
   title       String      @db.VarChar(200)
   description String?     @db.VarChar(1000)
   coverImage  String?     @db.VarChar(500)
@@ -42,6 +64,7 @@ model World {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  members          WorldMember[]
   campaigns        Campaign[]
   events           WorldEvent[]
   characters       Character[]
@@ -97,6 +120,7 @@ model WorldEvent {
   
   type       WorldEventType
   scope      WorldEventScope
+  impactLevel Int             @default(1) // 1=Micro, <=2 Micro, >=4 Macro
   
   // Canonical event data
   payload    Json?

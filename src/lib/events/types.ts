@@ -51,3 +51,19 @@ export interface CharacterCreatedPayload {
   level?: number;
   avatarUrl?: string;
 }
+
+export interface RollPayload {
+  expression: string; // e.g. "1d20+5"
+  result: number;
+  breakdown?: any; // Individual die results
+  label?: string; // Reason for roll
+  isPrivate?: boolean;
+}
+
+export interface AttackPayload {
+  attackerId: string;
+  targetId?: string;
+  weaponName: string;
+  roll: RollPayload;
+  damage?: RollPayload;
+}

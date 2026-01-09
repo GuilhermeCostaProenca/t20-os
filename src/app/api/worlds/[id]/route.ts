@@ -72,11 +72,18 @@ export async function DELETE(_req: Request, { params }: Context) {
   try {
     ({ id } = await Promise.resolve(params));
     if (!id) return missingId();
-    await prisma.world.delete({ where: { id } });
+
+    // SAFE DELETE: Soft delete only.
+    // We do NOT delete the world to preserve the Event Ledger.
+    await prisma.world.update({
+      where: { id },
+      data: { status: 'ARCHIVED' }
+    });
+
     return Response.json({ ok: true });
   } catch (error) {
     console.error("DELETE /api/worlds/[id]", error);
-    const message = "Nao foi possivel remover o mundo.";
+    const message = "Nao foi possivel arquivar o mundo.";
     return Response.json({ error: message, message }, { status: 500 });
   }
 }
