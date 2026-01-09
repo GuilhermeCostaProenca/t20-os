@@ -62,6 +62,12 @@ enum WorldEventVisibility {
 }
 
 enum WorldEventType {
+  // Metagame / Lifecycle
+  WORLD_CREATED
+  CAMPAIGN_CREATED
+  CHARACTER_CREATED
+  
+  // Gameplay
   ATTACK
   DAMAGE
   SPELL
@@ -88,18 +94,27 @@ model WorldEvent {
   campaignId String?
   sessionId  String?
   combatId   String?
+  
   type       WorldEventType
   scope      WorldEventScope
+  
+  // Canonical event data
+  payload    Json?
+  
   ts         DateTime             @default(now())
+  
+  // Metadata for querying/indexing
   actorId    String?              @db.VarChar(120)
   targetId   String?              @db.VarChar(120)
   visibility WorldEventVisibility @default(PLAYERS)
+  
+  // Legacy/Optional fields (kept for compatibility or specific specific usage)
   breakdown  Json?
   meta       Json?
   text       String?              @db.VarChar(500)
 
-  world    World     @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  world    World     @relation(fields: [worldId], references: [id])
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
 
   @@index([worldId, ts])
   @@index([campaignId, ts])

@@ -136,7 +136,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       id: crypto.randomUUID(),
       timestamp: now,
       type: "SESSION_START",
-      message: "Sessao iniciada",
+      message: "Sessão iniciada",
       visibility,
     };
     const timerEvent: SessionEvent = {
@@ -167,7 +167,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           id: crypto.randomUUID(),
           timestamp: now,
           type: "SESSION_END",
-          message: "Sessao encerrada",
+          message: "Sessão encerrada",
           visibility,
         },
         ...prev.events,

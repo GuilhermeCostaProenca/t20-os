@@ -72,7 +72,7 @@ export const CharacterCreateSchema = z.object({
 export const CharacterUpdateSchema = CharacterCreateSchema;
 
 export const NpcCreateSchema = z.object({
-  name: z.string().trim().min(1, "Nome obrigatorio"),
+  name: z.string().trim().min(1, "Nome obrigatório"),
   type: z.enum(["npc", "enemy"]).optional(),
   hpMax: z.coerce.number().int().min(1, "PV minimo e 1"),
   defenseFinal: z.coerce.number().int().min(0, "Defesa minima e 0").optional(),

@@ -68,6 +68,7 @@ export async function POST(req: Request) {
 
     const pages = pagesRaw ? Number(pagesRaw) || null : null;
 
+    // TODO: EVENT_MIGRATION - Replace direct create with dispatchEvent(RULESET_DOC_CREATED)
     const doc = await prisma.rulesetDocument.create({
       data: {
         rulesetId,

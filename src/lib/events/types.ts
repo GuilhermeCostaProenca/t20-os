@@ -1,60 +1,53 @@
-export type EventVisibility = "MASTER" | "PLAYERS" | "master" | "players";
+import { WorldEventScope, WorldEventVisibility, WorldEventType } from "@prisma/client";
 
-export type EventType =
-  | "ATTACK"
-  | "DAMAGE"
-  | "SPELL"
-  | "SKILL"
-  | "CONDITION_APPLIED"
-  | "CONDITION_REMOVED"
-  | "NOTE"
-  | "NPC_MENTION"
-  | "ITEM_MENTION"
-  | "OVERRIDE"
-  | "TURN"
-  | "INITIATIVE"
-  | "SESSION_START"
-  | "SESSION_END"
-  | "ROLL";
-
-export type EventBreakdown = {
-  toHit?: {
-    d20: number;
-    mod: number;
-    total: number;
-    isNat20?: boolean;
-    isNat1?: boolean;
-    isCritThreat?: boolean;
-    breakdown?: string;
-  };
-  damage?: {
-    total: number;
-    detail?: string;
-    isCrit?: boolean;
-  };
-  formula?: string;
-  cost?: {
-    mp?: number;
-    hp?: number;
-  };
-};
-
-export type EventMeta = {
-  campaignId?: string;
-  sessionId?: string;
-  combatId?: string;
-};
-
-export type EventPayload = {
+export type BaseEventPayload = Record<string, any>;
+export interface EventPayload extends BaseEventPayload {
   type: EventType;
-  ts?: string | Date;
+  visibility?: EventVisibility;
+  ts?: string;
+  payload?: any;
+  breakdown?: any;
+  meta?: any;
   actorId?: string;
   actorName?: string;
-  targetId?: string;
-  targetName?: string;
-  visibility?: EventVisibility;
-  breakdown?: EventBreakdown;
-  note?: string;
   message?: string;
-  meta?: EventMeta;
-};
+}
+
+export type EventType = WorldEventType | string;
+export type EventVisibility = WorldEventVisibility | string;
+
+export interface CreateEventParams<TPayload extends BaseEventPayload = any> {
+  type: WorldEventType;
+  worldId: string;
+  campaignId?: string;
+  entityId?: string; // Optional: ID if known (e.g. updating), or for creation correlation
+  actorId?: string;
+  payload: TPayload;
+  visibility?: WorldEventVisibility;
+  scope?: WorldEventScope;
+}
+
+// Payload Definitions
+export interface WorldCreatedPayload {
+  title: string;
+  description?: string;
+  coverImage?: string;
+}
+
+export interface CampaignCreatedPayload {
+  name: string;
+  description?: string;
+  system: string;
+  rulesetId: string;
+}
+
+export interface CharacterCreatedPayload {
+  name: string;
+  campaignId: string; // Redundant but useful in payload for processor context
+  description?: string;
+  ancestry?: string; // e.g. Humano
+  className?: string; // e.g. Guerreiro
+  role?: string; // e.g. Tank
+  level?: number;
+  avatarUrl?: string;
+}

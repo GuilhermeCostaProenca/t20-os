@@ -26,6 +26,8 @@ export async function PUT(req: Request, { params }: Context) {
       return Response.json({ error: message, message }, { status: 404 });
     }
 
+    // TODO: EVENT_MIGRATION - Replace direct update with dispatchEvent(SESSION_UPDATED)
+    // Note: worldId check not needed for update as ID implies existence
     const updated = await prisma.session.update({
       where: { id },
       data: {
@@ -63,6 +65,7 @@ export async function DELETE(_req: Request, { params }: Context) {
       return Response.json({ error: message, message }, { status: 404 });
     }
 
+    // TODO: EVENT_MIGRATION - Replace direct delete with dispatchEvent(SESSION_DELETED)
     await prisma.session.delete({ where: { id } });
     return Response.json({ data: { id } });
   } catch (error) {

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { CampaignCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
+import { dispatchEvent } from "@/lib/events/dispatcher";
+import { WorldEventType } from "@prisma/client";
 
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -58,37 +60,45 @@ export async function POST(req: Request) {
     const payload = await req.json();
     const parsed = CampaignCreateSchema.parse(payload);
     const rulesetId = parsed.rulesetId ?? "tormenta20";
-    const roomCode = await createUniqueRoomCode();
+
+    // IDs generated client-side (here in the controller)
+    const { createId } = await import("@paralleldrive/cuid2");
 
     let worldId = parsed.worldId?.trim();
-    if (worldId) {
-      const existingWorld = await prisma.world.findUnique({
-        where: { id: worldId },
-        select: { id: true },
-      });
-      if (!existingWorld) {
-        const message = "Mundo informado nao encontrado.";
-        return Response.json({ error: message, message }, { status: 400 });
-      }
-    } else {
-      const createdWorld = await prisma.world.create({
-        data: {
-          title: parsed.name,
-          description: parsed.description,
-        },
-        select: { id: true },
-      });
-      worldId = createdWorld.id;
+
+    // 1. Enforce World Existence (World-First)
+    if (!worldId) {
+      return Response.json({ error: "worldId is required. Create a world first.", message: "worldId is required." }, { status: 400 });
     }
 
-    const campaign = await prisma.campaign.create({
-      data: {
+    // Validate world existence
+    const existingWorld = await prisma.world.findUnique({
+      where: { id: worldId },
+      select: { id: true },
+    });
+    if (!existingWorld) {
+      return Response.json({ error: "Mundo não encontrado", message: "Mundo não encontrado" }, { status: 400 });
+    }
+
+    // 2. Create Campaign via event
+    const campaignId = createId();
+    await dispatchEvent({
+      type: WorldEventType.CAMPAIGN_CREATED,
+      worldId: worldId,
+      entityId: campaignId,
+      campaignId: campaignId,
+      payload: {
         name: parsed.name,
         description: parsed.description,
-        rulesetId,
-        roomCode,
-        worldId,
+        system: "TORMENTA_20", // Default or from payload
+        rulesetId: rulesetId,
       },
+    });
+
+    // 3. Return the Projected Campaign
+    // Since dispatchEvent waits for processing, the campaign exists in DB now.
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
       include: { world: { select: { id: true, title: true } } },
     });
 
@@ -100,7 +110,7 @@ export async function POST(req: Request) {
     }
 
     console.error("POST /api/campaigns", error);
-    const message = "Nao foi possivel criar a campanha.";
+    const message = "Não foi possível criar a campanha.";
     return Response.json({ error: message, message }, { status: 500 });
   }
 }

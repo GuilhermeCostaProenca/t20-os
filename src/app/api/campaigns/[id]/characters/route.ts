@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { CharacterCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
+import { dispatchEvent } from "@/lib/events/dispatcher";
+import { WorldEventType } from "@prisma/client";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -40,15 +42,17 @@ export async function GET(_req: Request, { params }: RouteContext) {
   }
 }
 
-export async function POST(req: Request, { params }: RouteContext) {
+export async function POST(req: Request, context: RouteContext) {
   let id = "";
   try {
-    ({ id } = await params);
+    const { id: campaignId } = await context.params;
+    id = campaignId;
     if (!id) return missingId();
 
     const payload = await req.json();
     const parsed = CharacterCreateSchema.parse(payload);
 
+    // Verify campaign exists
     const campaign = await prisma.campaign.findUnique({
       where: { id },
       select: { id: true, worldId: true },
@@ -63,18 +67,30 @@ export async function POST(req: Request, { params }: RouteContext) {
       return Response.json({ error: message, message }, { status: 400 });
     }
 
-    const character = await prisma.character.create({
-      data: {
+    // Generate ID and Dispatch Event
+    const { createId } = await import("@paralleldrive/cuid2");
+    const characterId = createId();
+
+    await dispatchEvent({
+      type: WorldEventType.CHARACTER_CREATED,
+      worldId: campaign.worldId,
+      campaignId: id,
+      entityId: characterId,
+      payload: {
         name: parsed.name,
+        description: parsed.description,
         ancestry: parsed.ancestry,
         className: parsed.className,
         role: parsed.role,
-        description: parsed.description,
-        avatarUrl: parsed.avatarUrl,
         level: parsed.level,
-        campaignId: id,
-        worldId: campaign.worldId,
+        avatarUrl: parsed.avatarUrl,
+        campaignId: id, // Included in payload for processor convenience
       },
+    });
+
+    // Return the projected character
+    const character = await prisma.character.findUnique({
+      where: { id: characterId },
     });
 
     return Response.json({ data: character }, { status: 201 });

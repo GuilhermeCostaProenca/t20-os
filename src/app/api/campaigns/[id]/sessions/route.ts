@@ -57,6 +57,7 @@ export async function POST(req: Request, { params }: Context) {
       return Response.json({ error: message, message }, { status: 400 });
     }
 
+    // TODO: EVENT_MIGRATION - Replace direct create with dispatchEvent(SESSION_CREATED)
     const session = await prisma.session.create({
       data: {
         campaignId: id,

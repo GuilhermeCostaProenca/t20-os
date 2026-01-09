@@ -14,7 +14,7 @@ export function summarizeSession(rawEvents: any[]): SessionSummaryPayload {
 
   if (!events.length) {
     return {
-      summary: "Sessao sem eventos registrados.",
+      summary: "Sessão sem eventos registrados.",
       highlights: [],
       npcs: [],
       items: [],
@@ -46,8 +46,7 @@ export function summarizeSession(rawEvents: any[]): SessionSummaryPayload {
 
     if (breakdown.toHit?.total) {
       highlights.push(
-        `${ev.actorName ?? "Jogador"} rolou ${breakdown.toHit.total}${
-          breakdown.damage?.total ? ` e dano ${breakdown.damage.total}` : ""
+        `${ev.actorName ?? "Jogador"} rolou ${breakdown.toHit.total}${breakdown.damage?.total ? ` e dano ${breakdown.damage.total}` : ""
         }`
       );
     }
@@ -58,9 +57,8 @@ export function summarizeSession(rawEvents: any[]): SessionSummaryPayload {
   const npcs = Array.from(new Set([...npcsMentioned, ...targetsList])).slice(0, 10);
   const items = Array.from(itemsFound).slice(0, 10);
 
-  const summary = `Sessao com ${events.length} eventos. Participantes: ${
-    actorsList.length ? actorsList.slice(0, 5).join(", ") : "N/D"
-  }. Principais alvos: ${targetsList.length ? targetsList.slice(0, 5).join(", ") : "N/D"}.`;
+  const summary = `Sessão com ${events.length} eventos. Participantes: ${actorsList.length ? actorsList.slice(0, 5).join(", ") : "N/D"
+    }. Principais alvos: ${targetsList.length ? targetsList.slice(0, 5).join(", ") : "N/D"}.`;
 
   const hooks = [
     npcs[0] ? `Revisar envolvimento de ${npcs[0]}.` : "Mapear ganchos para a proxima sessao.",

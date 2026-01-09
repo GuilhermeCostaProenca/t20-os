@@ -58,6 +58,7 @@ export async function POST(req: Request, { params }: Context) {
       return Response.json({ error: message, message }, { status: 400 });
     }
 
+    // TODO: EVENT_MIGRATION - Replace direct create with dispatchEvent(NPC_CREATED)
     const npc = await prisma.npc.create({
       data: {
         campaignId: id,

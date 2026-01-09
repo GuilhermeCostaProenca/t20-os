@@ -6,7 +6,7 @@ import { ZodError } from "zod";
 type Context = { params: { id: string } | Promise<{ id: string }> };
 
 function missingId() {
-  const message = "Parametro id obrigatorio.";
+  const message = "Parâmetro id obrigatório.";
   return Response.json({ error: message, message }, { status: 400 });
 }
 
@@ -77,7 +77,7 @@ export async function GET(_req: Request, { params }: Context) {
     return Response.json({ data: sheet });
   } catch (error) {
     console.error("GET /api/characters/[id]/sheet", error);
-    const message = "Nao foi possivel carregar a ficha.";
+    const message = "Não foi possível carregar a ficha.";
     return Response.json({ error: message, message }, { status: 500 });
   }
 }
@@ -112,7 +112,7 @@ export async function PUT(req: Request, { params }: Context) {
       return Response.json({ error: message, message }, { status: 400 });
     }
     console.error("PUT /api/characters/[id]/sheet", error);
-    const message = "Nao foi possivel atualizar a ficha.";
+    const message = "Não foi possível atualizar a ficha.";
     return Response.json({ error: message, message }, { status: 500 });
   }
 }
