@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_req: Request, { params }: RouteContext) {
+  const { id } = await params;
 
   try {
     const campaign = await prisma.campaign.findUnique({

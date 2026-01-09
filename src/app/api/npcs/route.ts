@@ -4,11 +4,15 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const campaignId = searchParams.get("campaignId") || undefined;
+    const worldId = searchParams.get("worldId") || undefined;
     const term = (searchParams.get("term") || "").trim();
 
     const where: Record<string, any> = {};
     if (campaignId) {
       where.campaignId = campaignId;
+    }
+    if (worldId) {
+      where.worldId = worldId;
     }
     if (term) {
       where.OR = [

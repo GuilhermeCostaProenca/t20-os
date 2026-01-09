@@ -8,9 +8,18 @@ const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const rulesetId = searchParams.get("rulesetId") || undefined;
+  const worldId = searchParams.get("worldId") || undefined;
+
+  const where: Record<string, any> = {};
+  if (rulesetId) {
+    where.rulesetId = rulesetId;
+  }
+  if (worldId) {
+    where.worldId = worldId;
+  }
 
   const docs = await prisma.rulesetDocument.findMany({
-    where: rulesetId ? { rulesetId } : undefined,
+    where: Object.keys(where).length ? where : undefined,
     orderBy: { createdAt: "desc" },
   });
 
@@ -23,6 +32,7 @@ export async function POST(req: Request) {
     const file = form.get("file");
     const title = (form.get("title") as string | null)?.trim();
     const rulesetId = (form.get("rulesetId") as string | null)?.trim() || "tormenta20";
+    const worldId = (form.get("worldId") as string | null)?.trim();
     const type = (form.get("type") as string | null)?.trim() || "pdf";
     const pagesRaw = form.get("pages") as string | null;
     const textIndex = (form.get("textIndex") as string | null) ?? undefined;
@@ -34,6 +44,20 @@ export async function POST(req: Request) {
     if (!title) {
       const message = "Titulo e obrigatorio.";
       return Response.json({ error: message, message }, { status: 400 });
+    }
+    if (!worldId) {
+      const message = "worldId e obrigatorio.";
+      return Response.json({ error: message, message }, { status: 400 });
+    }
+
+    // Verify world exists
+    const world = await prisma.world.findUnique({
+      where: { id: worldId },
+      select: { id: true },
+    });
+    if (!world) {
+      const message = "Mundo nao encontrado.";
+      return Response.json({ error: message, message }, { status: 404 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -47,6 +71,7 @@ export async function POST(req: Request) {
     const doc = await prisma.rulesetDocument.create({
       data: {
         rulesetId,
+        worldId,
         title,
         type,
         pages: pages ?? undefined,

@@ -42,9 +42,9 @@ export function SessionSummaryButton() {
     () =>
       state.events.map((ev) => ({
         type: ev.type,
-        actorName: undefined,
-        targetName: undefined,
-        payloadJson: ev.payload,
+        actorName: ev.actorName,
+        targetName: ev.targetName,
+        payloadJson: ev.breakdown || undefined,
         ts: ev.timestamp,
         message: ev.message,
       })),

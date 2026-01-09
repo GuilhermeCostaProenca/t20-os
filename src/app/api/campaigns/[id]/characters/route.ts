@@ -3,7 +3,7 @@ import { CharacterCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
 type RouteContext = {
-  params: { id: string } | Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
 };
 
 function missingId() {
@@ -14,7 +14,7 @@ function missingId() {
 export async function GET(_req: Request, { params }: RouteContext) {
   let id = "";
   try {
-    ({ id } = await Promise.resolve(params));
+    ({ id } = await params);
     if (!id) return missingId();
 
     const campaign = await prisma.campaign.findUnique({
@@ -43,7 +43,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
 export async function POST(req: Request, { params }: RouteContext) {
   let id = "";
   try {
-    ({ id } = await Promise.resolve(params));
+    ({ id } = await params);
     if (!id) return missingId();
 
     const payload = await req.json();
@@ -51,12 +51,16 @@ export async function POST(req: Request, { params }: RouteContext) {
 
     const campaign = await prisma.campaign.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, worldId: true },
     });
 
     if (!campaign) {
       const message = "Campanha nao encontrada.";
       return Response.json({ error: message, message }, { status: 404 });
+    }
+    if (!campaign.worldId) {
+      const message = "Campanha nao possui mundo associado.";
+      return Response.json({ error: message, message }, { status: 400 });
     }
 
     const character = await prisma.character.create({
@@ -69,6 +73,7 @@ export async function POST(req: Request, { params }: RouteContext) {
         avatarUrl: parsed.avatarUrl,
         level: parsed.level,
         campaignId: id,
+        worldId: campaign.worldId,
       },
     });
 

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NpcCreateSchema } from "@/lib/validators";
 import { ZodError } from "zod";
 
-type Context = { params: { id: string } | Promise<{ id: string }> };
+type Context = { params: Promise<{ id: string }> };
 
 function missingId() {
   const message = "Parametro id obrigatorio.";
@@ -12,7 +12,7 @@ function missingId() {
 export async function GET(_req: Request, { params }: Context) {
   let id = "";
   try {
-    ({ id } = await Promise.resolve(params));
+    ({ id } = await params);
     if (!id) return missingId();
 
     const campaign = await prisma.campaign.findUnique({
@@ -40,23 +40,28 @@ export async function GET(_req: Request, { params }: Context) {
 export async function POST(req: Request, { params }: Context) {
   let id = "";
   try {
-    ({ id } = await Promise.resolve(params));
+    ({ id } = await params);
     if (!id) return missingId();
     const payload = await req.json();
     const parsed = NpcCreateSchema.parse(payload);
 
     const campaign = await prisma.campaign.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, worldId: true },
     });
     if (!campaign) {
       const message = "Campanha nao encontrada.";
       return Response.json({ error: message, message }, { status: 404 });
     }
+    if (!campaign.worldId) {
+      const message = "Campanha nao possui mundo associado.";
+      return Response.json({ error: message, message }, { status: 400 });
+    }
 
     const npc = await prisma.npc.create({
       data: {
         campaignId: id,
+        worldId: campaign.worldId,
         name: parsed.name,
         type: parsed.type ?? "npc",
         hpMax: parsed.hpMax,

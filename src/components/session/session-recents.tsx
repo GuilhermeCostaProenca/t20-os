@@ -23,11 +23,11 @@ export function SessionRecents() {
   const recentRolls = useMemo(
     () =>
       state.events
-        .filter((e) => e.type === "roll")
+        .filter((e) => e.type === "ROLL")
         .slice(0, 3)
         .map((e) => ({
           label: e.message,
-          badge: e.payload?.roll ? `${e.payload.roll.total}` : undefined,
+          badge: e.breakdown?.toHit ? `${e.breakdown.toHit.total}` : undefined,
         })),
     [state.events]
   );
@@ -35,7 +35,7 @@ export function SessionRecents() {
   const recentNpcs = useMemo(
     () =>
       state.events
-        .filter((e) => e.type === "npc")
+        .filter((e) => e.type === "NPC_MENTION")
         .slice(0, 3)
         .map((e) => ({ label: e.message, badge: "NPC" })),
     [state.events]

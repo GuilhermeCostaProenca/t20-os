@@ -28,6 +28,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const roomCode = searchParams.get("roomCode")?.trim().toUpperCase();
+    const worldId = searchParams.get("worldId") || undefined;
 
     if (roomCode) {
       const campaign = await prisma.campaign.findUnique({
@@ -37,7 +38,9 @@ export async function GET(req: Request) {
       return Response.json({ data: campaign ? [campaign] : [] });
     }
 
+    const where = worldId ? { worldId } : undefined;
     const campaigns = await prisma.campaign.findMany({
+      where,
       orderBy: { updatedAt: "desc" },
       include: { world: { select: { id: true, title: true } } },
     });

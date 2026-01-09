@@ -107,7 +107,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return state.elapsedMs + (tick - state.lastStartedAt);
   }, [state.elapsedMs, state.running, state.lastStartedAt, tick]);
 
-  function logEvent(event: Partial<SessionEvent> & { type: string; message?: string }) {
+  function logEvent(event: Partial<SessionEvent> & { type: string; message?: string; breakdown?: any }) {
     const now = new Date().toISOString();
     const normalized = normalizeEvent({
       ...event,
@@ -262,7 +262,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       type: "ROLL",
       message: `Rolagem d20 (${base} ${mod >= 0 ? "+" : ""}${mod}) = ${total}`,
       visibility,
-      payload: {
+      breakdown: {
         toHit: { d20: base, mod, total },
       },
     });

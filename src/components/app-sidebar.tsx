@@ -14,23 +14,41 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { extractWorldIdFromPath } from "@/lib/active-world";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Brand } from "./brand";
 
-const navItems = [
+const baseNavItems = [
   { id: "mesa", href: "/app", label: "Mesa", icon: LayoutDashboard },
   { id: "mundos", href: "/app/worlds", label: "Mundos", icon: Globe2 },
-  { id: "personagens", href: "/app/personagens", label: "Personagens", icon: UserCircle2 },
-  { id: "npcs", href: "/app/npcs", label: "NPCs", icon: ShieldHalf },
-  { id: "locais", href: "/app/locais", label: "Locais", icon: MapPin },
-  { id: "compendio", href: "/app/compendio", label: "Compêndio", icon: BookOpenText },
-  { id: "diario", href: "/app/diario", label: "Diário", icon: NotebookPen },
+];
+
+const worldNavItems = [
+  { id: "characters", path: "characters", label: "Personagens", icon: UserCircle2 },
+  { id: "npcs", path: "npcs", label: "NPCs", icon: ShieldHalf },
+  { id: "locations", path: "locations", label: "Locais", icon: MapPin },
+  { id: "compendium", path: "compendium", label: "Compêndio", icon: BookOpenText },
+  { id: "diary", path: "diary", label: "Diário", icon: NotebookPen },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const worldId = extractWorldIdFromPath(pathname);
+  const isInWorld = worldId !== null;
+
+  const navItems = isInWorld
+    ? [
+        ...baseNavItems,
+        ...worldNavItems.map((item) => ({
+          id: item.id,
+          href: `/app/worlds/${worldId}/${item.path}`,
+          label: item.label,
+          icon: item.icon,
+        })),
+      ]
+    : baseNavItems;
 
   return (
     <aside className="hidden lg:block">

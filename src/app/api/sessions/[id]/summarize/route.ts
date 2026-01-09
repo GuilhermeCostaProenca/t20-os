@@ -40,10 +40,16 @@ export async function POST(req: Request, { params }: Context) {
 
     const summary = summarizeSession([...(combatEvents as any[]), ...((parsed.events as any[]) ?? [])]);
 
+    if (!campaign?.worldId) {
+      const message = "Nao foi possivel determinar o mundo da campanha.";
+      return Response.json({ error: message, message }, { status: 400 });
+    }
+
     const saved = await prisma.sessionSummary.create({
       data: {
         sessionId: id,
         campaignId: parsed.campaignId,
+        worldId: campaign.worldId,
         summary: summary.summary,
         highlights: summary.highlights,
         npcs: summary.npcs,

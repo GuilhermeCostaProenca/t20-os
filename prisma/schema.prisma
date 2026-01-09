@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Campaign {
-  id          String      @id @default(cuid())
+  id          String   @id @default(cuid())
   worldId     String
-  name        String      @db.VarChar(120)
-  roomCode    String      @unique @db.VarChar(12)
-  system      String      @default("TORMENTA_20") @db.VarChar(40)
-  rulesetId   String      @default("tormenta20") @db.VarChar(50)
-  description String?     @db.VarChar(500)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  name        String   @db.VarChar(120)
+  roomCode    String   @unique @db.VarChar(12)
+  system      String   @default("TORMENTA_20") @db.VarChar(40)
+  rulesetId   String   @default("tormenta20") @db.VarChar(50)
+  description String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  world       World       @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world       World        @relation(fields: [worldId], references: [id], onDelete: Cascade)
   characters  Character[]
   npcs        Npc[]
   sessions    Session[]
@@ -42,8 +42,13 @@ model World {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  campaigns   Campaign[]
-  events      WorldEvent[]
+  campaigns        Campaign[]
+  events           WorldEvent[]
+  characters       Character[]
+  npcs             Npc[]
+  sessions         Session[]
+  sessionSummaries SessionSummary[]
+  rulesetDocuments RulesetDocument[]
 }
 
 enum WorldEventScope {
@@ -78,20 +83,20 @@ enum WorldEventType {
 }
 
 model WorldEvent {
-  id         String              @id @default(cuid())
+  id         String               @id @default(cuid())
   worldId    String
   campaignId String?
   sessionId  String?
   combatId   String?
   type       WorldEventType
   scope      WorldEventScope
-  ts         DateTime            @default(now())
-  actorId    String?             @db.VarChar(120)
-  targetId   String?             @db.VarChar(120)
+  ts         DateTime             @default(now())
+  actorId    String?              @db.VarChar(120)
+  targetId   String?              @db.VarChar(120)
   visibility WorldEventVisibility @default(PLAYERS)
   breakdown  Json?
   meta       Json?
-  text       String?             @db.VarChar(500)
+  text       String?              @db.VarChar(500)
 
   world    World     @relation(fields: [worldId], references: [id], onDelete: Cascade)
   campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
@@ -102,68 +107,71 @@ model WorldEvent {
 }
 
 model Character {
-  id         String    @id @default(cuid())
-  campaignId String
-  name       String    @db.VarChar(120)
-  ancestry   String?   @db.VarChar(120)
-  className  String?   @db.VarChar(120)
-  role       String?   @db.VarChar(120)
+  id          String   @id @default(cuid())
+  campaignId  String
+  worldId     String
+  name        String   @db.VarChar(120)
+  ancestry    String?  @db.VarChar(120)
+  className   String?  @db.VarChar(120)
+  role        String?  @db.VarChar(120)
   description String?  @db.VarChar(500)
-  avatarUrl  String?   @db.VarChar(500)
-  level      Int       @default(1)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  avatarUrl   String?  @db.VarChar(500)
+  level       Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sheet      CharacterSheet?
+  campaign Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  world    World           @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  sheet    CharacterSheet?
 
   @@index([campaignId])
+  @@index([worldId])
 }
 
 model Reveal {
-  id         String   @id @default(cuid())
-  roomCode   String   @db.VarChar(12)
-  type       String   @db.VarChar(12)
-  title      String   @db.VarChar(180)
+  id         String    @id @default(cuid())
+  roomCode   String    @db.VarChar(12)
+  type       String    @db.VarChar(12)
+  title      String    @db.VarChar(180)
   content    Json
-  imageUrl   String?  @db.VarChar(500)
-  visibility String   @default("players") @db.VarChar(16)
-  createdAt  DateTime @default(now())
+  imageUrl   String?   @db.VarChar(500)
+  visibility String    @default("players") @db.VarChar(16)
+  createdAt  DateTime  @default(now())
   expiresAt  DateTime?
 
   @@index([roomCode, createdAt])
 }
 
 model CharacterSheet {
-  id           String   @id @default(cuid())
-  characterId  String   @unique
-  sheetRulesetId String  @db.VarChar(50) @default("tormenta20")
-  level        Int      @default(1)
-  className    String?  @db.VarChar(120)
-  ancestry     String?  @db.VarChar(120)
-  deity        String?  @db.VarChar(120)
-  for          Int      @default(10)
-  des          Int      @default(10)
-  con          Int      @default(10)
-  int          Int      @default(10)
-  sab          Int      @default(10)
-  car          Int      @default(10)
-  pvCurrent    Int      @default(0)
-  pvMax        Int      @default(0)
-  pmCurrent    Int      @default(0)
-  pmMax        Int      @default(0)
-  attackBonus  Int      @default(0)
-  damageFormula String   @default("1d6")
-  critRange    Int      @default(20)
+  id             String  @id @default(cuid())
+  characterId    String  @unique
+  sheetRulesetId String  @default("tormenta20") @db.VarChar(50)
+  level          Int     @default(1)
+  className      String? @db.VarChar(120)
+  ancestry       String? @db.VarChar(120)
+  deity          String? @db.VarChar(120)
+  for            Int     @default(10)
+  des            Int     @default(10)
+  con            Int     @default(10)
+  int            Int     @default(10)
+  sab            Int     @default(10)
+  car            Int     @default(10)
+  pvCurrent      Int     @default(0)
+  pvMax          Int     @default(0)
+  pmCurrent      Int     @default(0)
+  pmMax          Int     @default(0)
+  attackBonus    Int     @default(0)
+  damageFormula  String  @default("1d6")
+  critRange      Int     @default(20)
   critMultiplier Int     @default(2)
-  defenseFinal Int      @default(10)
-  defenseRef   Int      @default(0)
-  defenseFort  Int      @default(0)
-  defenseWill  Int      @default(0)
-  skills       Json?
-  attacks      Json?
-  spells       Json?
-  notes        String?
+  defenseFinal   Int     @default(10)
+  defenseRef     Int     @default(0)
+  defenseFort    Int     @default(0)
+  defenseWill    Int     @default(0)
+  skills         Json?
+  attacks        Json?
+  spells         Json?
+  notes          String?
 
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 }
@@ -177,31 +185,31 @@ model Combat {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  campaign    Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  combatants  Combatant[]
-  events      CombatEvent[]
-  conditions  AppliedCondition[]
+  campaign   Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  combatants Combatant[]
+  events     CombatEvent[]
+  conditions AppliedCondition[]
 }
 
 model Combatant {
-  id            String   @id @default(cuid())
-  combatId      String
-  kind          String   @db.VarChar(16)
-  refId         String   @db.VarChar(120)
-  name          String   @db.VarChar(200)
-  initiative    Int      @default(0)
-  hpCurrent     Int      @default(0)
-  hpMax         Int      @default(0)
-  mpCurrent     Int      @default(0)
-  mpMax         Int      @default(0)
-  defenseFinal  Int      @default(10)
-  attackBonus   Int      @default(0)
-  damageFormula String   @default("1d6") @db.VarChar(50)
-  isPlayerVisible Boolean @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  combatId        String
+  kind            String   @db.VarChar(16)
+  refId           String   @db.VarChar(120)
+  name            String   @db.VarChar(200)
+  initiative      Int      @default(0)
+  hpCurrent       Int      @default(0)
+  hpMax           Int      @default(0)
+  mpCurrent       Int      @default(0)
+  mpMax           Int      @default(0)
+  defenseFinal    Int      @default(10)
+  attackBonus     Int      @default(0)
+  damageFormula   String   @default("1d6") @db.VarChar(50)
+  isPlayerVisible Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  combat Combat @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  combat            Combat             @relation(fields: [combatId], references: [id], onDelete: Cascade)
   appliedConditions AppliedCondition[]
 
   @@index([combatId])
@@ -214,10 +222,10 @@ model CombatEvent {
   actorName   String   @db.VarChar(200)
   type        String   @db.VarChar(16)
   payloadJson Json
-  visibility  String   @db.VarChar(12) @default("PLAYERS")
+  visibility  String   @default("PLAYERS") @db.VarChar(12)
 
-  combat              Combat             @relation(fields: [combatId], references: [id], onDelete: Cascade)
-  appliedConditions   AppliedCondition[]
+  combat            Combat             @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  appliedConditions AppliedCondition[]
 
   @@index([combatId, ts])
 }
@@ -246,9 +254,9 @@ model AppliedCondition {
   expiresAtTurn     Int?
   createdAt         DateTime @default(now())
 
-  combat      Combat      @relation(fields: [combatId], references: [id], onDelete: Cascade)
-  target      Combatant   @relation(fields: [targetCombatantId], references: [id], onDelete: Cascade)
-  condition   Condition   @relation(fields: [conditionId], references: [id], onDelete: Restrict)
+  combat      Combat       @relation(fields: [combatId], references: [id], onDelete: Cascade)
+  target      Combatant    @relation(fields: [targetCombatantId], references: [id], onDelete: Cascade)
+  condition   Condition    @relation(fields: [conditionId], references: [id], onDelete: Restrict)
   sourceEvent CombatEvent? @relation(fields: [sourceEventId], references: [id], onDelete: SetNull)
 
   @@index([combatId])
@@ -260,6 +268,7 @@ model AppliedCondition {
 model RulesetDocument {
   id         String   @id @default(cuid())
   rulesetId  String   @db.VarChar(50)
+  worldId    String
   title      String   @db.VarChar(200)
   type       String   @db.VarChar(32)
   filePath   String   @db.VarChar(500)
@@ -268,14 +277,18 @@ model RulesetDocument {
   textIndex  String?
   createdAt  DateTime @default(now())
 
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
   @@index([rulesetId, createdAt])
   @@index([title])
+  @@index([worldId])
 }
 
 model SessionSummary {
   id         String   @id @default(cuid())
   sessionId  String   @db.VarChar(120)
   campaignId String?  @db.VarChar(120)
+  worldId    String
   summary    String   @db.Text
   highlights Json?
   npcs       Json?
@@ -283,29 +296,36 @@ model SessionSummary {
   hooks      Json?
   createdAt  DateTime @default(now())
 
+  world World @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
   @@index([sessionId])
   @@index([campaignId, createdAt])
+  @@index([worldId])
 }
 
 model Session {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   campaignId  String
-  title       String   @db.VarChar(200)
-  description String?  @db.VarChar(1000)
-  coverUrl    String?  @db.VarChar(500)
+  worldId     String
+  title       String    @db.VarChar(200)
+  description String?   @db.VarChar(1000)
+  coverUrl    String?   @db.VarChar(500)
   scheduledAt DateTime?
-  status      String   @default("planned") @db.VarChar(16)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("planned") @db.VarChar(16)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  world    World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, scheduledAt])
+  @@index([worldId])
 }
 
 model Npc {
   id            String   @id @default(cuid())
   campaignId    String
+  worldId       String
   name          String   @db.VarChar(120)
   type          String   @default("npc") @db.VarChar(12)
   hpMax         Int      @default(1)
@@ -318,8 +338,10 @@ model Npc {
   updatedAt     DateTime @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  world    World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
+  @@index([worldId])
 }
 
 model ActionRequest {
@@ -331,7 +353,7 @@ model ActionRequest {
   targetId   String   @db.VarChar(120)
   type       String   @db.VarChar(20)
   payload    Json
-  status     String   @db.VarChar(16) @default("PENDING")
+  status     String   @default("PENDING") @db.VarChar(16)
   createdAt  DateTime @default(now())
 
   @@index([campaignId, status, createdAt])
