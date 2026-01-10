@@ -108,6 +108,10 @@ enum WorldEventType {
   WORLD_CHANGE
   CONDITION_APPLIED
   CONDITION_REMOVED
+  
+  // New Combat Lifecycle
+  COMBAT_STARTED
+  COMBAT_ENDED
   ROLL
 }
 

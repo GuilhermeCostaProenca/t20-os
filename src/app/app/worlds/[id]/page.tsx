@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   CalendarClock, Plus, RefreshCw, Trash, MapPin,
   Book, Users, Activity, Globe, ChevronRight, Settings,
-  Sword, Scroll, LayoutDashboard
+  Sword, Scroll, LayoutDashboard, Map as MapIcon
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -337,6 +337,9 @@ export default function WorldDetailPage() {
                   <CardTitle className="text-base">Mundo</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
+                  <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-white" onClick={() => router.push(`/app/worlds/${worldId}/map`)}>
+                    <MapIcon className="mr-2 h-4 w-4" /> Atlas Interativo
+                  </Button>
                   <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-white" onClick={() => router.push(`/app/worlds/${worldId}/npcs`)}>
                     <Users className="mr-2 h-4 w-4" /> Bestiário
                   </Button>

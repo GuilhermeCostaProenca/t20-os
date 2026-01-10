@@ -1,41 +1,53 @@
-export type AbilityDef = {
-  key: string;
-  label: string;
-  order: number;
-};
 
-export type ResourceDef = {
-  key: string;
-  label: string;
-  order: number;
-};
+// Generic RPG Types (Universal)
 
-export type AttackResult = {
-  d20: number;
-  mod: number;
-  total: number;
-  isNat20: boolean;
-  isNat1: boolean;
-  isCritThreat?: boolean;
-  breakdown?: string;
-  attackName?: string;
-};
+export type AttributeKey = 'for' | 'des' | 'con' | 'int' | 'sab' | 'car';
 
-export type DamageResult = {
-  total: number;
-  detail?: string;
-  isCrit: boolean;
-  attackName?: string;
-};
+export interface AttributeModifiers {
+  for?: number;
+  des?: number;
+  con?: number;
+  int?: number;
+  sab?: number;
+  car?: number;
+}
 
-export type CheckResult = {
-  d20: number;
-  mod: number;
-  total: number;
-  breakdown?: string;
-};
+export interface Ability {
+  name: string;
+  description: string;
+  type?: 'passive' | 'active' | 'reaction';
+  cost?: { pm?: number; action?: string };
+}
 
-export type ConditionModifiers = {
+export interface Race {
+  id: string;
+  name: string;
+  attributes: AttributeModifiers;
+  attributeSelectable?: number;
+  abilities: Ability[];
+  size: 'small' | 'medium' | 'large';
+  displacement: number;
+}
+
+export interface CharacterClass {
+  id: string;
+  name: string;
+  hp: { base: number; perLevel: number };
+  pm: { base: number; perLevel: number };
+  proficiencies: string[];
+  description: string;
+}
+
+export interface RulesetData {
+  id: string;
+  name: string;
+  races: Race[];
+  classes: CharacterClass[];
+}
+
+// --- Engine Result Types ---
+
+export interface ConditionModifiers {
   attackMod?: number;
   skillMod?: number;
   spellMod?: number;
@@ -43,35 +55,57 @@ export type ConditionModifiers = {
   costMpMod?: number;
   dcMod?: number;
   notes?: string[];
-};
+}
 
-export type ConditionContext = {
+export interface ConditionContext {
   actorConditions?: any[];
   targetConditions?: any[];
-  actionType?: "ATTACK" | "SPELL" | "SKILL";
+  actionType?: 'ATTACK' | 'SKILL' | 'SPELL';
   attack?: any;
   skill?: any;
   spell?: any;
-};
+}
 
-export type SpellResult = {
+export interface RollResult {
+  d20?: number;
+  total: number;
+  detail?: string;
+  breakdown?: string;
+  isCrit?: boolean;
+}
+
+export interface AttackResult extends RollResult {
+  isCritThreat: boolean;
+  attackName?: string;
+}
+
+export interface DamageResult extends RollResult {
+  damageType?: string;
+  attackName?: string;
+}
+
+export interface CheckResult extends RollResult {
+  mod: number;
+}
+
+export interface SpellResult {
   hitOrSaveResult?: CheckResult;
   damage?: DamageResult | null;
-  cost?: { mp?: number };
-  effectsApplied?: Array<{ conditionKey?: string; note?: string }>;
+  cost: { mp: number };
+  effectsApplied: any[];
   breakdown?: string;
-};
+}
 
 export interface Ruleset {
   id: string;
   name: string;
-  abilities: AbilityDef[];
-  resources: ResourceDef[];
-  computeAttack: (args: { sheet: any; attack?: any; context?: ConditionContext }) => AttackResult;
-  computeDamage: (args: { sheet: any; attack?: any; isCrit: boolean; context?: ConditionContext }) => DamageResult;
-  computeSkillCheck: (args: { sheet: any; skill?: any; context?: ConditionContext }) => CheckResult;
-  computeSpell: (args: { sheet: any; spell?: any; context?: ConditionContext }) => SpellResult;
-  applyConditionsModifiers: (context: ConditionContext) => ConditionModifiers;
+  abilities: any[];
+  resources: any[];
+  computeAttack: (params: any) => AttackResult;
+  computeDamage: (params: any) => DamageResult;
+  computeSkillCheck: (params: any) => CheckResult;
+  computeSpell: (params: any) => SpellResult;
+  applyConditionsModifiers: (ctx: ConditionContext) => ConditionModifiers;
   getAbilityMod: (score: number) => number;
-  validateSheet?: (sheet: any) => any;
+  validateSheet: (sheet: any) => any;
 }

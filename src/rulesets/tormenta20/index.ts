@@ -10,6 +10,8 @@ import {
   Ruleset,
   SpellResult,
 } from "../base/types";
+export * from './races';
+export * from './classes';
 
 const abilities = [
   { key: "for", label: "Forca", order: 1 },
@@ -163,14 +165,14 @@ function computeAttack({
     typeof attack?.ability === "string" && typeof sheet?.[attack.ability] === "number"
       ? sheet[attack.ability]
       : typeof attack?.abilityScore === "number"
-      ? attack.abilityScore
-      : baseAbility;
+        ? attack.abilityScore
+        : baseAbility;
   const attackBonus =
     typeof attack?.bonus === "number"
       ? attack.bonus
       : typeof sheet?.attackBonus === "number"
-      ? sheet.attackBonus
-      : 0;
+        ? sheet.attackBonus
+        : 0;
   const conditionMods = applyConditionsModifiers({
     ...(context ?? {}),
     actionType: "ATTACK",
@@ -182,16 +184,15 @@ function computeAttack({
     typeof attack?.critRange === "number"
       ? attack.critRange
       : typeof sheet?.critRange === "number"
-      ? sheet.critRange
-      : 20;
+        ? sheet.critRange
+        : 20;
   const isCritThreat = roll.d20 >= critRange;
 
   return {
     ...roll,
     isCritThreat,
-    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${
-      conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
-    }`,
+    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+      }`,
     attackName: attack?.name,
   };
 }
@@ -211,15 +212,15 @@ function computeDamage({
     typeof attack?.damage === "string" && attack.damage.trim().length > 0
       ? attack.damage
       : typeof sheet?.damageFormula === "string"
-      ? sheet.damageFormula
-      : undefined;
+        ? sheet.damageFormula
+        : undefined;
   const formula = formulaCandidate && formulaCandidate.trim().length > 0 ? formulaCandidate : "1d6";
   const critMultiplier =
     typeof attack?.critMultiplier === "number"
       ? attack.critMultiplier
       : typeof sheet?.critMultiplier === "number"
-      ? sheet.critMultiplier
-      : 2;
+        ? sheet.critMultiplier
+        : 2;
 
   const conditionMods = applyConditionsModifiers({
     ...(context ?? {}),
@@ -262,9 +263,8 @@ function computeSkillCheck({
     d20: roll.d20,
     mod,
     total: roll.total,
-    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${
-      conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
-    }`,
+    breakdown: `d20=${roll.d20} + ${mod} = ${roll.total}${conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+      }`,
   };
 }
 
@@ -304,9 +304,8 @@ function computeSpell({
       d20: roll.d20,
       mod: baseMod,
       total: roll.total,
-      breakdown: `d20=${roll.d20} + ${baseMod} = ${roll.total}${
-        conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
-      }`,
+      breakdown: `d20=${roll.d20} + ${baseMod} = ${roll.total}${conditionMods.notes?.length ? ` (${conditionMods.notes.join(", ")})` : ""
+        }`,
     };
   }
 
@@ -314,15 +313,15 @@ function computeSpell({
   const damage =
     formula && formula.length > 0
       ? (() => {
-          const roll = rollFormula(formula);
-          const adjusted = roll.total + (conditionMods.damageMod ?? 0);
-          return {
-            total: adjusted,
-            detail: `${roll.detail}${conditionMods.damageMod ? (conditionMods.damageMod > 0 ? "+" : "") + conditionMods.damageMod : ""}`,
-            isCrit: false,
-            attackName: normalized.name,
-          };
-        })()
+        const roll = rollFormula(formula);
+        const adjusted = roll.total + (conditionMods.damageMod ?? 0);
+        return {
+          total: adjusted,
+          detail: `${roll.detail}${conditionMods.damageMod ? (conditionMods.damageMod > 0 ? "+" : "") + conditionMods.damageMod : ""}`,
+          isCrit: false,
+          attackName: normalized.name,
+        };
+      })()
       : null;
 
   return {
@@ -331,8 +330,8 @@ function computeSpell({
     cost: { mp: costMp },
     effectsApplied: Array.isArray(normalized.effectsApplied)
       ? normalized.effectsApplied.map((entry: any) =>
-          typeof entry === "string" ? { conditionKey: entry } : entry
-        )
+        typeof entry === "string" ? { conditionKey: entry } : entry
+      )
       : [],
     breakdown: hitOrSaveResult?.breakdown,
   };

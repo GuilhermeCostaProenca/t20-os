@@ -9,23 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-// --- T20 Constants (Simplified for MVP) ---
-const RACES = [
-    { id: "human", name: "Humano", mods: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, description: "Versáteis e ambiciosos." },
-    { id: "elf", name: "Elfo", mods: { dex: 2, int: 1, con: -1 }, description: "Graciosos e mágicos." },
-    { id: "dwarf", name: "Anão", mods: { con: 2, wis: 1, dex: -1 }, description: "Resistentes e teimosos." },
-    { id: "minotaur", name: "Minotauro", mods: { str: 2, con: 1, wis: -1 }, description: "Fortes e temidos." },
-    { id: "goblin", name: "Goblin", mods: { dex: 2, int: 1, cha: -1 }, description: "Pequenos e engenhosos." },
-    { id: "lefou", name: "Lefou", mods: { str: 1, con: 1, cha: -1 }, description: "Tocados pela Tormenta." },
-];
+import { TORMENTA20_RACES } from "@/rulesets/tormenta20/races";
+import { TORMENTA20_CLASSES } from "@/rulesets/tormenta20/classes";
+import { Race, CharacterClass } from "@/rulesets/base/types";
 
-const CLASSES = [
-    { id: "warrior", name: "Guerreiro", hp: 20, pm: 3, description: "Mestre do combate." },
-    { id: "mage", name: "Arcanista", hp: 8, pm: 6, description: "Manipulador da realidade." },
-    { id: "rogue", name: "Ladino", hp: 12, pm: 4, description: "Especialista em perícias." },
-    { id: "cleric", name: "Clérigo", hp: 16, pm: 5, description: "Devoto dos deuses." },
-    { id: "bard", name: "Bardo", hp: 12, pm: 4, description: "Inspirador e versátil." },
-];
+// --- T20 Constants (Grimoire Powered) ---
+const RACES = TORMENTA20_RACES.map(r => ({
+    id: r.id,
+    name: r.name,
+    // Map PT-BR keys (for, des) to EN keys (str, dex) used in this component state
+    mods: {
+        str: r.attributes.for || 0,
+        dex: r.attributes.des || 0,
+        con: r.attributes.con || 0,
+        int: r.attributes.int || 0,
+        wis: r.attributes.sab || 0,
+        cha: r.attributes.car || 0,
+    },
+    description: r.abilities.map(a => a.name).join(", "), // Summary of abilities
+    fullAbilities: r.abilities
+}));
+
+const CLASSES = TORMENTA20_CLASSES;
 
 const ATTRIBUTES = [
     { id: "str", name: "Força" },
@@ -47,7 +52,7 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
     const [name, setName] = useState("");
     const [selectedCampaignId, setSelectedCampaignId] = useState(campaigns[0]?.id || "");
     const [selectedRace, setSelectedRace] = useState<any>(RACES[0]);
-    const [selectedClass, setSelectedClass] = useState<any>(CLASSES[0]);
+    const [selectedClass, setSelectedClass] = useState<CharacterClass>(CLASSES[0]);
 
     // Attributes (Base 10 + Point Buy + Race Mods)
     // Simplified: Just direct input or simple +/- for now? 
@@ -74,8 +79,8 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
 
     function handleFinish() {
         // Calculate derived stats
-        const finalHp = selectedClass.hp + Math.floor((totalStats.con - 10) / 2);
-        const finalPm = selectedClass.pm; // Simplified
+        const finalHp = selectedClass.hp.base + Math.floor((totalStats.con - 10) / 2);
+        const finalPm = selectedClass.pm.base; // Simplified
 
         const data = {
             campaignId: selectedCampaignId,
@@ -137,8 +142,8 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
                                             {r.name}
                                             {selectedRace.id === r.id && <Check className="w-3 h-3 text-primary" />}
                                         </div>
-                                        <p className="opacity-60 text-xs mt-1">{r.description}</p>
-                                        <div className="flex gap-1 mt-2 text-[10px] opacity-80 font-mono">
+                                        <p className="opacity-60 text-xs mt-1 truncate">{r.description}</p>
+                                        <div className="flex gap-1 mt-2 text-[10px] opacity-80 font-mono flex-wrap">
                                             {Object.entries(r.mods).map(([k, v]) => (
                                                 <span key={k} className={Number(v) > 0 ? "text-green-400" : "text-red-400"}>
                                                     {k.toUpperCase()} {Number(v) > 0 ? '+' : ''}{v as number}
@@ -165,8 +170,8 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
                                     )}
                                 >
                                     <div className="p-2 bg-black/40 rounded-full">
-                                        {c.id === 'warrior' ? <Sword className="w-5 h-5 text-red-500" /> :
-                                            c.id === 'mage' ? <Sparkles className="w-5 h-5 text-blue-500" /> :
+                                        {c.id === 'guerreiro' ? <Sword className="w-5 h-5 text-red-500" /> :
+                                            c.id === 'arcanista' ? <Sparkles className="w-5 h-5 text-blue-500" /> :
                                                 <Shield className="w-5 h-5 text-amber-500" />}
                                     </div>
                                     <div className="flex-1">
@@ -174,8 +179,8 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
                                         <p className="opacity-60">{c.description}</p>
                                     </div>
                                     <div className="text-right text-xs opacity-70 font-mono">
-                                        <div>PV: {c.hp}</div>
-                                        <div>PM: {c.pm}</div>
+                                        <div>PV: {c.hp.base}+{c.hp.perLevel}/lvl</div>
+                                        <div>PM: {c.pm.base}+{c.pm.perLevel}/lvl</div>
                                     </div>
                                 </div>
                             ))}
@@ -227,8 +232,8 @@ export function CharacterWizard({ campaigns, onComplete, onCancel }: CharacterWi
                             {name} será um {selectedRace.name} {selectedClass.name} com {totalStats.str} de Força e {totalStats.int} de Inteligência.
                         </p>
                         <div className="bg-white/5 p-4 rounded-lg inline-block text-left text-sm font-mono border border-white/10">
-                            <div>PV (Vida): {selectedClass.hp + Math.floor(((totalStats.con || 10) - 10) / 2)}</div>
-                            <div>PM (Mana): {selectedClass.pm}</div>
+                            <div>PV (Vida): {selectedClass.hp.base + Math.floor(((totalStats.con || 10) - 10) / 2)}</div>
+                            <div>PM (Mana): {selectedClass.pm.base}</div>
                         </div>
                     </div>
                 )}
