@@ -45,259 +45,85 @@ const initialForm = {
   description: "",
 };
 
+
 export default function DashboardPage() {
   const router = useRouter();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [worlds, setWorlds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState(initialForm);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const sortedCampaigns = useMemo(
-    () =>
-      [...campaigns].sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      ),
-    [campaigns]
-  );
 
   useEffect(() => {
-    loadCampaigns();
+    loadWorlds();
   }, []);
 
-  async function loadCampaigns() {
-    setLoading(true);
-    setError(null);
+  async function loadWorlds() {
     try {
-      const res = await fetch("/api/campaigns", { cache: "no-store" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(payload.error ?? "Não foi possível carregar campanhas");
-      }
-      setCampaigns(payload.data ?? []);
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Erro inesperado ao carregar campanhas";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCreate(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    setFormError(null);
-    const parsed = CampaignCreateSchema.safeParse(form);
-    if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "Dados inválidos");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/campaigns", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(payload.error ?? "Não foi possível criar a campanha");
-      }
-
-      setForm(initialForm);
-      setDialogOpen(false);
-      await loadCampaigns();
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Erro inesperado ao salvar campanha";
-      setFormError(message);
-    } finally {
-      setSubmitting(false);
-    }
+      const res = await fetch("/api/worlds");
+      const json = await res.json();
+      if (res.ok) setWorlds(json.data || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.2em] text-primary">
-            Painel
-          </p>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Campanhas</h1>
-            <Badge className="border-primary/30 bg-primary/10 text-primary">
-              Tormenta 20
-            </Badge>
-          </div>
-          <p className="text-muted-foreground">
-            Crie, organize e navegue entre suas campanhas da mesa.
-          </p>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">Mesa de Jogo</h1>
+          <p className="text-muted-foreground">Selecione um mundo para jogar ou mestrar.</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="border-primary/30 bg-white/5 text-primary"
-            onClick={loadCampaigns}
-            disabled={loading}
-          >
-            <Sparkles className="h-4 w-4" />
-            Atualizar
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
-                <Plus className="h-4 w-4" />
-                Nova campanha
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
-              <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-                <DialogTitle>Nova campanha</DialogTitle>
-                <DialogDescription>
-                  Defina um nome épico e uma descrição curta. Validamos os
-                  campos automaticamente.
-                </DialogDescription>
-              </DialogHeader>
-              <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreate}>
-                <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
-                  <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Nome
-                  </label>
-                  <Input
-                    placeholder="Ex.: Fortaleza de Valkaria"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Descrição
-                  </label>
-                  <Textarea
-                    placeholder="Breve contexto da campanha"
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    rows={4}
-                  />
-                </div>
-                {formError ? (
-                  <p className="text-sm text-destructive">{formError}</p>
-                ) : null}
-                </div>
-                <div className="shrink-0 border-t border-white/10 px-6 py-4">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      onClick={() => setDialogOpen(false)}
-                      className="text-muted-foreground"
-                      disabled={submitting}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
-                    >
-                      {submitting ? "Salvando..." : "Criar campanha"}
-                    </Button>
-                  </div>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Button onClick={() => router.push("/app/worlds")} variant="outline" className="border-primary/30 text-primary">
+          <Sparkles className="mr-2 h-4 w-4" />
+          Gerenciar Mundos
+        </Button>
       </div>
 
-      <Separator className="border-white/10" />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Create World Card Trigger */}
+        <div
+          onClick={() => router.push("/app/worlds")}
+          className="group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 transition-colors hover:border-primary/50 hover:bg-primary/5"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+            <Plus className="h-6 w-6" />
+          </div>
+          <span className="font-semibold text-primary">Novo Mundo</span>
+        </div>
 
-      {loading ? (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="chrome-panel h-48 animate-pulse rounded-2xl border border-white/10 bg-white/5"
-            />
-          ))}
-        </div>
-      ) : error ? (
-        <EmptyState
-          title="Falha ao carregar"
-          description={error}
-          action={
-            <Button onClick={loadCampaigns} className="shadow-[0_0_18px_rgba(226,69,69,0.3)]">
-              Tentar novamente
-            </Button>
-          }
-          icon={<Swords className="h-6 w-6" />}
-        />
-      ) : sortedCampaigns.length === 0 ? (
-        <EmptyState
-          title="Nenhuma campanha ainda"
-          description="Crie sua primeira campanha e comece a operar sua mesa."
-          action={
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nova campanha
-            </Button>
-          }
-          icon={<Swords className="h-6 w-6" />}
-        />
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sortedCampaigns.map((campaign) => (
-            <Card
-              key={campaign.id}
-              className="chrome-panel group relative cursor-pointer rounded-2xl border-white/10 bg-white/5 transition duration-150 hover:-translate-y-1 hover:border-primary/25"
-              onClick={() => router.push(`/app/campaign/${campaign.id}`)}
-            >
-              <CardHeader className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge className="border-primary/25 bg-primary/10 text-primary">
-                    {campaign.system}
-                  </Badge>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
-                </div>
-                <CardTitle className="text-lg font-semibold">
-                  {campaign.name}
-                </CardTitle>
-                <CardDescription className="line-clamp-2">
-                  {campaign.description || "Sem descrição no momento."}
-                </CardDescription>
-                {campaign.world?.title ? (
-                  <Badge className="w-fit border-white/10 bg-white/5 text-xs text-muted-foreground">
-                    Mundo: {campaign.world.title}
-                  </Badge>
-                ) : null}
-              </CardHeader>
-              <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Atualizada {new Date(campaign.updatedAt).toLocaleDateString("pt-BR")}</span>
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_rgba(226,69,69,0.5)]" />
-                  Pronta
+        {/* World Cards */}
+        {loading ? (
+          [1, 2].map(i => <div key={i} className="h-64 animate-pulse rounded-3xl bg-white/5" />)
+        ) : worlds.map(world => (
+          <div key={world.id} onClick={() => router.push(`/app/worlds/${world.id}`)} className="cursor-pointer group relative overflow-hidden rounded-3xl border border-white/10 bg-black/40 hover:border-primary/50 transition-all">
+            {/* Cover Image Placeholder */}
+            <div className="h-32 w-full bg-gradient-to-b from-primary/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+
+            <div className="p-6">
+              <div className="mb-2 flex items-center justify-between">
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] tracking-widest uppercase">
+                  {world.role || "GM"}
+                </Badge>
+                {world.status === 'ACTIVE' && <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_limegreen]" />}
+              </div>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">{world.title}</h3>
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                {world.description || "Um vasto mundo de aventuras..."}
+              </p>
+
+              <div className="mt-6 flex items-center gap-4 text-xs text-muted-foreground/60">
+                <span className="flex items-center gap-1">
+                  <Swords className="h-3 w-3" /> {world.campaigns?.length || 0} Campanhas
                 </span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                <span className="flex items-center gap-1">
+                  <ArrowRight className="h-3 w-3" /> Acessar
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+
+

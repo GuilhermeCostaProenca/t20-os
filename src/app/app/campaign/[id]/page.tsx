@@ -638,13 +638,19 @@ export default function CampaignPage() {
             </Badge>
             <h1 className="text-3xl font-bold">{campaign.name}</h1>
             <p className="text-muted-foreground">
-              {campaign.description || "Sem descriÃ§Ã£o ainda. Adicione detalhes em breve."}
+              {campaign.description || "Sem descrição ainda. Adicione detalhes em breve."}
             </p>
           </div>
           <div className="flex gap-2">
+            <Link href={`/app/play/${campaignId}`}>
+              <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
+                <Swords className="mr-2 h-4 w-4" />
+                Iniciar Sessão
+              </Button>
+            </Link>
             <Button variant="outline" className="border-primary/30 text-primary">
               <Sparkles className="h-4 w-4" />
-              Em breve: ficha rÃ¡pida
+              Em breve: ficha rápida
             </Button>
             <Button
               variant="outline"
@@ -875,8 +881,8 @@ export default function CampaignPage() {
                         {submitting
                           ? "Salvando..."
                           : editingCharacter
-                          ? "Salvar"
-                          : "Criar personagem"}
+                            ? "Salvar"
+                            : "Criar personagem"}
                       </Button>
                     </div>
                   </div>
@@ -1183,8 +1189,8 @@ export default function CampaignPage() {
                         {npcSubmitting
                           ? "Salvando..."
                           : editingNpc
-                          ? "Salvar"
-                          : "Criar NPC"}
+                            ? "Salvar"
+                            : "Criar NPC"}
                       </Button>
                     </div>
                   </div>
@@ -1210,9 +1216,9 @@ export default function CampaignPage() {
               {sortedNpcs.map((npc) => {
                 const tags = npc.tags
                   ? npc.tags
-                      .split(",")
-                      .map((tag) => tag.trim())
-                      .filter(Boolean)
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean)
                   : [];
                 return (
                   <Card
@@ -1286,7 +1292,7 @@ export default function CampaignPage() {
           />
         </TabsContent>
 
-                <TabsContent value="sessions" className="space-y-4">
+        <TabsContent value="sessions" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="space-y-1">
               <h3 className="text-lg font-semibold">Sessoes</h3>
@@ -1442,8 +1448,8 @@ export default function CampaignPage() {
                         {sessionSubmitting
                           ? "Salvando..."
                           : editingSession
-                          ? "Salvar"
-                          : "Criar sessao"}
+                            ? "Salvar"
+                            : "Criar sessao"}
                       </Button>
                     </div>
                   </div>
@@ -1474,8 +1480,8 @@ export default function CampaignPage() {
                   session.status === "active"
                     ? "Ativa"
                     : session.status === "finished"
-                    ? "Encerrada"
-                    : "Planejada";
+                      ? "Encerrada"
+                      : "Planejada";
                 return (
                   <Card
                     key={session.id}
@@ -1534,6 +1540,6 @@ export default function CampaignPage() {
           />
         </TabsContent>
       </Tabs>
-    </div>
+    </div >
   );
 }

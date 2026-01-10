@@ -22,8 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Brand } from "./brand";
 
 const baseNavItems = [
-  { id: "mesa", href: "/app", label: "Mesa", icon: LayoutDashboard },
-  { id: "mundos", href: "/app/worlds", label: "Mundos", icon: Globe2 },
+  { id: "mundos", href: "/app", label: "Meus Mundos", icon: Globe2 },
 ];
 
 const worldNavItems = [

@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useRef, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { RefreshCw, Send, Shield, Sparkles } from "lucide-react";
+import { RefreshCw, Send, Shield, Sparkles, BookOpen } from "lucide-react";
+import { QuickSheet } from "./quick-sheet";
+import { RevealOverlay } from "@/components/reveal-overlay";
+import { AudioRecorder } from "@/components/audio-recorder";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,28 +68,51 @@ function DiceTray({ onRoll }: { onRoll: (expression: string) => void }) {
 
 function EventBubble({ event }: { event: GameEvent }) {
     const isRoll = event.type === 'ROLL';
+    const isAttack = event.type === 'ATTACK';
     const isNote = event.type === 'NOTE';
+    const isScribe = event.payload?.isSummary;
+
+    if (isScribe) {
+        return (
+            <div className="flex flex-col gap-2 p-4 rounded-lg bg-amber-900/20 border border-amber-500/30 animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-2 text-amber-500 mb-1">
+                    <BookOpen className="h-4 w-4" />
+                    <span className="font-bold text-sm uppercase tracking-wider">O Escriba</span>
+                    <span className="ml-auto text-[10px] opacity-70">{new Date(event.ts).toLocaleTimeString()}</span>
+                </div>
+                <div className="text-sm text-foreground/90 whitespace-pre-wrap font-serif leading-relaxed">
+                    {event.payload.text}
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="flex flex-col gap-1 p-3 rounded-lg bg-black/20 border border-white/5 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center text-xs text-muted-foreground">
-                <span className="font-bold text-primary/80">{event.actorName || "Sistema"}</span>
+                <span className="font-bold text-primary/80">{event.actorName || event.payload?.author || "Sistema"}</span>
                 <span>{new Date(event.ts).toLocaleTimeString()}</span>
             </div>
 
-            {isRoll && (
-                <div className="flex items-center gap-3 mt-1">
-                    <div className="flex flex-col items-center justify-center w-10 h-10 rounded bg-primary/20 border border-primary/30 text-primary font-bold text-lg">
-                        {event.payload.result}
+            {(isRoll || isAttack) && (
+                <div className="flex flex-col gap-2 mt-1">
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            "flex flex-col items-center justify-center w-10 h-10 rounded text-primary font-bold text-lg border",
+                            event.payload.isHit !== undefined
+                                ? (event.payload.isHit ? "bg-green-500/20 border-green-500/50 text-green-400" : "bg-red-500/20 border-red-500/50 text-red-400")
+                                : "bg-primary/20 border-primary/30"
+                        )}>
+                            {event.payload.roll?.result ?? event.payload.result}
+                        </div>
+                        <div>
+                            <div className="text-xs font-mono text-muted-foreground">{event.payload.roll?.expression ?? event.payload.expression}</div>
+                            <div className="text-sm font-medium">{event.payload.weaponName ?? event.payload.label}</div>
+                        </div>
                     </div>
-                    <div>
-                        <div className="text-xs font-mono text-muted-foreground">{event.payload.expression}</div>
-                        <div className="text-sm font-medium">{event.payload.label}</div>
-                    </div>
-                    {event.payload.breakdown && (
-                        <div className="ml-auto text-[10px] text-muted-foreground font-mono opacity-50">
-                            {/* Simplify breakdown display */}
-                            Details
+                    {event.payload.message && (
+                        <div className="text-xs font-bold text-center bg-black/40 py-1 rounded text-foreground/80">
+                            {event.payload.message}
                         </div>
                     )}
                 </div>
@@ -95,7 +122,7 @@ function EventBubble({ event }: { event: GameEvent }) {
                 <p className="text-sm text-foreground/90">{event.payload.text || "..."}</p>
             )}
 
-            {!isRoll && !isNote && (
+            {!isRoll && !isNote && !isAttack && (
                 <div className="text-xs font-mono text-muted-foreground">
                     [{event.type}] {JSON.stringify(event.payload)}
                 </div>
@@ -111,6 +138,7 @@ export default function PlayPage() {
     const [events, setEvents] = useState<GameEvent[]>([]);
     const [loading, setLoading] = useState(false);
     const [chatInput, setChatInput] = useState("");
+    const [sheetCollapsed, setSheetCollapsed] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Polling Effect
@@ -213,6 +241,30 @@ export default function PlayPage() {
         // We rely on polling to see the result, or we could manual fetch immediately
     }
 
+    async function handleSummarize() {
+        if (!context) return;
+        await fetch('/api/play/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ worldId: context.worldId, campaignId })
+        });
+    }
+
+    async function processVoiceCommand(text: string) {
+        if (!context) return;
+        try {
+            await fetch('/api/ai/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text,
+                    worldId: context.worldId,
+                    campaignId
+                })
+            });
+        } catch (e) { console.error(e); }
+    }
+
     const sendChat = (e: FormEvent) => {
         e.preventDefault();
         if (!chatInput.trim()) return;
@@ -223,9 +275,18 @@ export default function PlayPage() {
     if (!context) return <div className="flex h-screen items-center justify-center">Carregando Jogo...</div>;
 
     return (
-        <div className="flex h-screen w-full bg-background overflow-hidden flex-col md:flex-row">
-            {/* LEFT: Game Board (Placeholder) */}
-            <div className="flex-1 bg-neutral-900/50 relative flex flex-col justify-center items-center text-muted-foreground p-4">
+        <div className="flex h-screen w-full bg-background overflow-hidden flex-row">
+            {context?.campaign?.roomCode && <RevealOverlay roomCode={context.campaign.roomCode} />}
+            {/* LEFT: Quick Sheet */}
+            <QuickSheet
+                campaignId={campaignId}
+                onAction={handleAction}
+                collapsed={sheetCollapsed}
+                onToggle={() => setSheetCollapsed(!sheetCollapsed)}
+            />
+
+            {/* CENTER: Game Board (Placeholder) */}
+            <div className="flex-1 bg-neutral-900/50 relative flex flex-col justify-center items-center text-muted-foreground p-4 overflow-hidden">
                 <Sparkles className="w-16 h-16 opacity-20 mb-4" />
                 <h2 className="text-xl font-bold opacity-50">Mesa de Jogo</h2>
                 <p className="opacity-40 max-w-md text-center">
@@ -240,10 +301,15 @@ export default function PlayPage() {
             </div>
 
             {/* RIGHT: Sidebar (Chat & Logs) */}
-            <div className="w-full md:w-[350px] border-l border-white/10 bg-sidebar flex flex-col">
+            <div className="w-full md:w-[350px] border-l border-white/10 bg-sidebar flex flex-col z-20">
                 <div className="p-3 border-b border-white/10 flex justify-between items-center bg-black/20">
-                    <span className="font-bold text-sm tracking-wider uppercase text-primary/80 truncate">{context.campaign.name}</span>
-                    <Badge variant="outline" className="text-[10px] h-5">Online</Badge>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-sm tracking-wider uppercase text-primary/80 truncate max-w-[200px]">{context.campaign.name}</span>
+                        <Badge variant="outline" className="text-[10px] h-4 w-fit border-green-500/30 text-green-500">Online</Badge>
+                    </div>
+                    <Button variant="ghost" size="icon" title="Invocar O Escriba" onClick={handleSummarize}>
+                        <BookOpen className="h-4 w-4 text-amber-500" />
+                    </Button>
                 </div>
 
                 <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -268,6 +334,12 @@ export default function PlayPage() {
                         <Button size="icon" type="submit" variant="default">
                             <Send className="w-4 h-4" />
                         </Button>
+                        <AudioRecorder
+                            onTranscriptionComplete={(text) => {
+                                handleAction('CHAT', { text, author: 'Mestre (Voz)' });
+                                processVoiceCommand(text);
+                            }}
+                        />
                     </form>
                 </div>
             </div>

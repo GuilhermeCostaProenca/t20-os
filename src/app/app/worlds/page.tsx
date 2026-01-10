@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,9 @@ export default function WorldsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Archiving State
+  const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
+
   const sortedWorlds = useMemo(
     () =>
       [...worlds].sort(
@@ -62,14 +65,14 @@ export default function WorldsPage() {
   );
 
   useEffect(() => {
-    loadWorlds();
-  }, []);
+    loadWorlds(currentTab);
+  }, [currentTab]);
 
-  async function loadWorlds() {
+  async function loadWorlds(status: 'ACTIVE' | 'ARCHIVED') {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/worlds", { cache: "no-store" });
+      const res = await fetch(`/api/worlds?status=${status}`, { cache: "no-store" });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload.error ?? "Não foi possível carregar mundos");
@@ -85,6 +88,18 @@ export default function WorldsPage() {
       setLoading(false);
     }
   }
+
+  async function handleArchive(e: React.MouseEvent, worldId: string) {
+    e.stopPropagation(); // Prevent card click
+    if (!confirm("Tem certeza que deseja arquivar este mundo?")) return;
+
+    try {
+      await fetch(`/api/worlds/${worldId}`, { method: 'DELETE' });
+      loadWorlds(currentTab);
+    } catch (e) { console.error(e); }
+  }
+
+  // ... handleCreate ...
 
   async function handleCreate(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -109,13 +124,10 @@ export default function WorldsPage() {
 
       setForm(initialForm);
       setDialogOpen(false);
-      await loadWorlds();
+      loadWorlds(currentTab);
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Erro inesperado ao salvar mundo";
-      setFormError(message);
+      const msg = err instanceof Error ? err.message : "Erro";
+      setFormError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -129,7 +141,7 @@ export default function WorldsPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">Universos vivos</h1>
             <Badge className="border-primary/30 bg-primary/10 text-primary">
-              World
+              {currentTab === 'ACTIVE' ? 'Ativos' : 'Arquivados'}
             </Badge>
           </div>
           <p className="text-muted-foreground">
@@ -137,95 +149,116 @@ export default function WorldsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentTab('ACTIVE')}
+              className={currentTab === 'ACTIVE' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}
+            >
+              Ativos
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentTab('ARCHIVED')}
+              className={currentTab === 'ARCHIVED' ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}
+            >
+              Arquivados
+            </Button>
+          </div>
+
           <Button
             variant="outline"
             className="border-primary/30 bg-white/5 text-primary"
-            onClick={loadWorlds}
+            onClick={() => loadWorlds(currentTab)}
             disabled={loading}
           >
             <Sparkles className="h-4 w-4" />
-            Atualizar
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
-                <Plus className="h-4 w-4" />
-                Novo mundo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
-              <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-                <DialogTitle>Novo mundo</DialogTitle>
-                <DialogDescription>
-                  Crie um universo base para suas campanhas e eventos.
-                </DialogDescription>
-              </DialogHeader>
-              <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreate}>
-                <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Nome</label>
-                    <Input
-                      placeholder="Ex.: Atlas de Arton"
-                      value={form.title}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, title: e.target.value }))
-                      }
-                    />
+
+          {currentTab === 'ACTIVE' && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="shadow-[0_0_24px_rgba(226,69,69,0.35)]">
+                  <Plus className="h-4 w-4" />
+                  Novo mundo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-xl flex-col overflow-hidden border-white/10 bg-card/80 p-0 text-left backdrop-blur">
+                <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+                  <DialogTitle>Novo mundo</DialogTitle>
+                  <DialogDescription>
+                    Crie um universo base para suas campanhas e eventos.
+                  </DialogDescription>
+                </DialogHeader>
+                <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleCreate}>
+                  <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Nome</label>
+                      <Input
+                        placeholder="Ex.: Atlas de Arton"
+                        value={form.title}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, title: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Descrição</label>
+                      <Textarea
+                        placeholder="Breve resumo do mundo"
+                        value={form.description}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        rows={4}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Cover URL</label>
+                      <Input
+                        placeholder="Opcional: https://"
+                        value={form.coverImage}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            coverImage: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    {formError ? (
+                      <p className="text-sm text-destructive">{formError}</p>
+                    ) : null}
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Descrição</label>
-                    <Textarea
-                      placeholder="Breve resumo do mundo"
-                      value={form.description}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                      rows={4}
-                    />
+                  <div className="shrink-0 border-t border-white/10 px-6 py-4">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() => setDialogOpen(false)}
+                        className="text-muted-foreground"
+                        disabled={submitting}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
+                      >
+                        {submitting ? "Salvando..." : "Criar mundo"}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Cover URL</label>
-                    <Input
-                      placeholder="Opcional: https://"
-                      value={form.coverImage}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          coverImage: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  {formError ? (
-                    <p className="text-sm text-destructive">{formError}</p>
-                  ) : null}
-                </div>
-                <div className="shrink-0 border-t border-white/10 px-6 py-4">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      onClick={() => setDialogOpen(false)}
-                      className="text-muted-foreground"
-                      disabled={submitting}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
-                    >
-                      {submitting ? "Salvando..." : "Criar mundo"}
-                    </Button>
-                  </div>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -246,7 +279,7 @@ export default function WorldsPage() {
           description={error}
           action={
             <Button
-              onClick={loadWorlds}
+              onClick={() => loadWorlds(currentTab)}
               className="shadow-[0_0_18px_rgba(226,69,69,0.3)]"
             >
               Tentar novamente
@@ -255,13 +288,15 @@ export default function WorldsPage() {
         />
       ) : sortedWorlds.length === 0 ? (
         <EmptyState
-          title="Nenhum mundo ainda"
-          description="Crie um mundo base para organizar campanhas e eventos."
+          title={currentTab === 'ACTIVE' ? "Nenhum mundo ativo" : "Nenhum mundo arquivado"}
+          description={currentTab === 'ACTIVE' ? "Comece criando seu primeiro universo." : "Mundos arquivados aparecerão aqui."}
           action={
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Novo mundo
-            </Button>
+            currentTab === 'ACTIVE' ? (
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Novo mundo
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -277,9 +312,20 @@ export default function WorldsPage() {
                   <Badge className="border-primary/25 bg-primary/10 text-primary">
                     Mundo
                   </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Atualizado {new Date(world.updatedAt).toLocaleDateString("pt-BR")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(world.updatedAt).toLocaleDateString("pt-BR")}
+                    </span>
+                    {currentTab === 'ACTIVE' && (
+                      <div
+                        className="p-1 hover:bg-red-500/20 rounded-full transition-colors text-muted-foreground hover:text-red-500"
+                        onClick={(e) => handleArchive(e, world.id)}
+                        title="Arquivar Mundo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <CardTitle className="text-lg font-semibold">
                   {world.title}

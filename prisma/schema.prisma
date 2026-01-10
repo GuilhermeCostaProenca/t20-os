@@ -156,6 +156,11 @@ model Character {
   description String?  @db.VarChar(500)
   avatarUrl   String?  @db.VarChar(500)
   level       Int      @default(1)
+  attributes  Json?    // { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
+  skills      Json?    // { fight: 5, perception: 2 }
+  stats       Json?    // { hp: { current: 10, max: 10 }, pm: { ... } }
+  spells      Json?    // List of known spells
+  inventory   Json?    // List of items
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

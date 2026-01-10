@@ -4,9 +4,20 @@ import { ZodError } from "zod";
 import { dispatchEvent } from "@/lib/events/dispatcher";
 import { WorldEventType } from "@prisma/client";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+
+    const where: any = {};
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = "ACTIVE";
+    }
+
     const worlds = await prisma.world.findMany({
+      where,
       orderBy: { updatedAt: "desc" },
     });
 

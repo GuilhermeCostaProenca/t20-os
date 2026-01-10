@@ -14,7 +14,7 @@ function generateRoomCode(length = 6) {
 }
 
 // We need to pass tx to check uniqueness
-async function createUniqueRoomCode(tx: Tx) {
+export async function createUniqueRoomCode(tx: Prisma.TransactionClient) {
     for (let attempt = 0; attempt < 10; attempt += 1) {
         const code = generateRoomCode();
         const exists = await tx.campaign.findUnique({

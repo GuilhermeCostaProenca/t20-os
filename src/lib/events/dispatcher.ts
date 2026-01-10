@@ -42,6 +42,22 @@ export async function dispatchEvent(params: CreateEventParams) {
             });
         }
 
+        if (type === "CAMPAIGN_CREATED") {
+            // Bootstrap Campaign to satisfy FK if event links to itself
+            if (campaignId) {
+                const { createUniqueRoomCode } = await import("./processors/campaign");
+                const roomCode = await createUniqueRoomCode(tx);
+                await tx.campaign.create({
+                    data: {
+                        id: campaignId,
+                        worldId,
+                        name: "Pending...",
+                        roomCode,
+                    }
+                });
+            }
+        }
+
         // 1. Persist to Ledger
         const event = await tx.worldEvent.create({
             data: {

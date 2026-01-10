@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, RefreshCw } from "lucide-react";
+import { ArrowRight, RefreshCw, Plus } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { CharacterWizard } from "@/components/character-wizard";
 import { Separator } from "@/components/ui/separator";
 
 type Campaign = {
@@ -37,6 +39,26 @@ export default function WorldCharactersPage() {
   const [error, setError] = useState<string | null>(null);
   const [term, setTerm] = useState("");
   const [campaignFilter, setCampaignFilter] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  async function handleCreateCharacter(data: any) {
+    try {
+      const res = await fetch("/api/characters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          worldId,
+          ...data
+        })
+      });
+      if (!res.ok) throw new Error("Erro ao criar");
+      setWizardOpen(false);
+      loadData();
+    } catch (e) {
+      console.error(e);
+      setError("Falha ao salvar personagem");
+    }
+  }
 
   useEffect(() => {
     if (worldId) {
@@ -108,6 +130,24 @@ export default function WorldCharactersPage() {
           <RefreshCw className="h-4 w-4" />
           Atualizar
         </Button>
+
+        <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+          <DialogTrigger asChild>
+            <Button variant="default" className="ml-2 gap-2">
+              <Plus className="w-4 h-4" />
+              Novo Personagem
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl bg-transparent border-none shadow-none p-0">
+            {wizardOpen && (
+              <CharacterWizard
+                campaigns={campaigns}
+                onComplete={handleCreateCharacter}
+                onCancel={() => setWizardOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Separator className="border-white/10" />

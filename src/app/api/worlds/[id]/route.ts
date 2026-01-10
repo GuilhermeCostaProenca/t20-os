@@ -14,22 +14,44 @@ export async function GET(_req: Request, { params }: Context) {
   try {
     ({ id } = await Promise.resolve(params));
     if (!id) return missingId();
-    const world = await prisma.world.findUnique({
-      where: { id },
-      include: {
-        campaigns: {
-          select: { id: true, name: true, updatedAt: true },
-          orderBy: { updatedAt: "desc" },
+    const [world, locationCount, ruleCount, nextSession, npcCount, sessionCount] = await Promise.all([
+      prisma.world.findUnique({
+        where: { id },
+        include: {
+          campaigns: {
+            select: { id: true, name: true, updatedAt: true, roomCode: true },
+            orderBy: { updatedAt: "desc" },
+          },
         },
-      },
-    });
+      }),
+      prisma.rulesetDocument.count({ where: { worldId: id, type: 'LOCATION' } }),
+      prisma.rulesetDocument.count({ where: { worldId: id, type: 'RULE' } }),
+      prisma.session.findFirst({
+        where: { worldId: id, scheduledAt: { gt: new Date() }, status: { not: 'finished' } },
+        orderBy: { scheduledAt: 'asc' },
+        select: { id: true, title: true, scheduledAt: true, campaign: { select: { name: true } } }
+      }),
+      prisma.npc.count({ where: { worldId: id } }),
+      prisma.session.count({ where: { worldId: id } })
+    ]);
 
     if (!world) {
       const message = "Mundo nao encontrado.";
       return Response.json({ error: message, message }, { status: 404 });
     }
 
-    return Response.json({ data: world });
+    return Response.json({
+      data: {
+        ...world,
+        stats: {
+          locations: locationCount,
+          rules: ruleCount,
+          npcs: npcCount,
+          sessions: sessionCount,
+        },
+        nextSession
+      }
+    });
   } catch (error) {
     console.error("GET /api/worlds/[id]", error);
     const message = "Nao foi possivel carregar o mundo.";
