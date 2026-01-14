@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
     try {
         const tokens = await prisma.mapToken.findMany({
-            where: { campaignId: params.id },
+            where: { campaignId: id },
         });
 
         const pins = await prisma.mapPin.findMany({
-            where: { campaignId: params.id },
+            where: { campaignId: id },
         });
 
         return Response.json({ tokens, pins });

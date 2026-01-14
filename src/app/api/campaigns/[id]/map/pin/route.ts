@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
     try {
         const body = await req.json();
 
         // Create new Pin
         const pin = await prisma.mapPin.create({
             data: {
-                campaignId: params.id,
+                campaignId: id,
                 x: body.x,
                 y: body.y,
                 type: body.type || "poi",
@@ -24,7 +25,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id: campaignId } = await params;
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');

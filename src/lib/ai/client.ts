@@ -2,6 +2,6 @@ import OpenAI from "openai";
 
 // Ensure OPENAI_API_KEY is in .env
 export const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || "dummy",
     // Optional: organization, helper if needed
 });

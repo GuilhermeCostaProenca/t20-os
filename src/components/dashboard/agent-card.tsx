@@ -13,7 +13,9 @@ interface AgentCardProps {
         avatarUrl?: string;
         hp: { current: number; max: number };
         pm: { current: number; max: number };
-        attributes?: any; // Add attributes optional to fix lint error elsewhere
+        attributes?: any;
+        stats?: any; // Add stats optional
+        def?: number;
     };
     onSelect: () => void;
     className?: string;

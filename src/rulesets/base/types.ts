@@ -72,6 +72,7 @@ export interface RollResult {
   detail?: string;
   breakdown?: string;
   isCrit?: boolean;
+  isNat20?: boolean;
 }
 
 export interface AttackResult extends RollResult {

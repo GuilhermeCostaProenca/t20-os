@@ -1,6 +1,6 @@
 "use client";
 
-import { useConvexPolyhedron } from "@react-three/cannon";
+import { useSphere } from "@react-three/cannon";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Geometry } from "three-stdlib";
@@ -28,12 +28,12 @@ export function D20({ position, onRest }: { position: [number, number, number], 
         return [1];
     }, []);
 
-    const [ref, api] = useConvexPolyhedron(() => ({
+    const [ref, api] = useSphere(() => ({
         mass: 1,
         position,
-        args: geometry, // Simplistic passing, might need pure vertices
+        args: [1],
         material: { friction: 0.1, restitution: 0.5 },
-        onCollide: (e) => {
+        onCollide: (e: any) => {
             // e.contact.impactVelocity
         }
     }));
