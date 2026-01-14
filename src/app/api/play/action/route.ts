@@ -41,6 +41,30 @@ function parseAndRoll(expression: string): { total: number; breakdown: any[] } {
   }
 }
 
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const campaignId = searchParams.get("campaignId");
+
+  if (!campaignId) {
+    return Response.json({ error: "campaignId is required" }, { status: 400 });
+  }
+
+  try {
+    const requests = await prisma.actionRequest.findMany({
+      where: {
+        campaignId,
+        status: "PENDING"
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return Response.json({ data: requests });
+  } catch (error) {
+    console.error("Failed to fetch action requests", error);
+    return Response.json({ error: "Failed to fetch requests" }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();

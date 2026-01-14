@@ -5,9 +5,11 @@ import { User, Shield, Heart, Zap, ChevronRight, ChevronLeft, Dna, Swords, Cross
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AgentTerminal } from "@/components/agent/agent-terminal";
+
+import { OrdemSheet } from "@/components/sheet/ordem-sheet";
 
 type CharacterSheet = {
     level: number;
@@ -71,23 +73,8 @@ export function QuickSheet({ campaignId, onAction, collapsed, onToggle }: QuickS
     // Calc modifier: (Score - 10) / 2
     const getMod = (score: number) => Math.floor((score - 10) / 2);
 
-    if (collapsed) {
-        return (
-            <div className="w-[50px] border-r border-white/10 bg-black/20 flex flex-col items-center py-4 gap-4 z-40 relative">
-                <Button variant="ghost" size="icon" onClick={onToggle}>
-                    <ChevronRight className="h-4 w-4" />
-                </Button>
-                <div className="h-px w-8 bg-white/10" />
-                {activeChar && (
-                    <div className="flex flex-col gap-2 items-center">
-                        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 text-xs font-bold text-primary">
-                            {activeChar.name.charAt(0)}
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    }
+    // Unified render with CSS transition
+    // if (collapsed) ... removed to allow animation in main return
 
     // Map Character to AgentTerminal Props
     const terminalChar = activeChar ? {
@@ -108,15 +95,16 @@ export function QuickSheet({ campaignId, onAction, collapsed, onToggle }: QuickS
     } : null;
 
     return (
-        <div className="w-[450px] border-r border-white/10 bg-sidebar/95 backdrop-blur-md flex flex-col relative animate-in slide-in-from-left-2 duration-300 z-40 shadow-2xl">
-            <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-2 h-6 w-6 text-muted-foreground z-50 hover:bg-white/10 hover:text-white"
-                onClick={onToggle}
-            >
-                <ChevronLeft className="h-4 w-4" />
-            </Button>
+        <div className={cn(
+            "fixed inset-y-0 left-0 bg-sidebar/95 backdrop-blur-md flex flex-col transition-all duration-300 z-[70] shadow-2xl border-r border-white/10",
+            collapsed ? "w-0 -translate-x-full overflow-hidden" : "w-[380px] translate-x-0"
+        )}>
+            {/* Header/Close */}
+            <div className="absolute top-2 right-2 z-50">
+                <Button variant="ghost" size="icon" onClick={onToggle}>
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+            </div>
 
             {!activeChar ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-50">
@@ -138,11 +126,14 @@ export function QuickSheet({ campaignId, onAction, collapsed, onToggle }: QuickS
                         )}
                     </div>
 
-                    {/* The Terminal */}
+                    {/* The Official Sheet */}
                     {terminalChar && (
-                        <AgentTerminal
-                            character={terminalChar}
-                            onRoll={(expr, label) => onAction('ROLL_DICE', { expression: expr, label })}
+                        <OrdemSheet
+                            character={{
+                                ...terminalChar,
+                                attributes: terminalChar.attributes // OrdemSheet handles mapping
+                            }}
+                            onRoll={(expr: string, label: string) => onAction('ROLL_DICE', { expression: expr, label })}
                         />
                     )}
                 </div>

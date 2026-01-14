@@ -176,36 +176,78 @@ export default function PlayPage() {
         return () => clearInterval(interval);
     }, []);
 
-    const handlePinCreate = (pin: any) => {
+
+
+    const [mapTokens, setMapTokens] = useState<any[]>([]);
+
+    // Initial Map Load
+    useEffect(() => {
+        if (!campaignId) return;
+
+        fetch(`/api/campaigns/${campaignId}/map`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.tokens) setMapTokens(data.tokens);
+                if (data.pins) setPins(data.pins);
+            })
+            .catch(err => console.error("Map load failed", err));
+    }, [campaignId]);
+
+    // Token Sync (Optimistic + DB)
+    const handleTokenMove = async (id: string, x: number, y: number) => {
+        // Optimistic UI
+        setMapTokens(prev => prev.map(t => t.id === id ? { ...t, x, y } : t));
+
+        // Save (Debouce could be added here if needed, but for now direct save)
+        await fetch(`/api/campaigns/${campaignId}/map/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, x, y })
+        });
+    };
+
+    // Pin Sync
+    const handlePinCreate = async (pin: any) => {
         setPins(prev => [...prev, pin]);
 
         if (pin.type === 'PING') {
-            handleAction('PING', { x: pin.x, y: pin.y }); // Notify others
-
-            // Remove locally after 3s
+            handleAction('PING', { x: pin.x, y: pin.y });
             setTimeout(() => {
                 setPins(prev => prev.filter(p => p.id !== pin.id));
             }, 3000);
+        } else {
+            // Save Persistent Pin (MARKER)
+            await fetch(`/api/campaigns/${campaignId}/map/pin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pin)
+            });
         }
     };
 
-    // Fetch Characters
+    // Fetch Characters (and auto-create MapTokens if missing)
     useEffect(() => {
         if (campaignId) {
             fetch(`/api/characters?campaignId=${campaignId}&withSheet=true`)
                 .then(res => res.json())
                 .then(json => {
-                    if (json.data) setCharacters(json.data);
+                    if (json.data) {
+                        setCharacters(json.data);
+                        // Optional: Check if we need to sync characters to map tokens
+                        // For now, we assume tokens are independent or created explicitly. 
+                        // But for "Living World", dragging a character to map should create token.
+                        // We'll leave that for a "Roster" drag-drop later.
+                        // Current logic: If mapTokens is empty, maybe auto-populate? 
+                        // Let's keep it clean for now.
+                    }
                 });
         }
     }, [campaignId]);
 
-    // Polling Effect for Events (and ideally refresh characters on frequent changes)
+    // Polling Effect for Events
     useEffect(() => {
-        // Initial fetch
         fetchEvents();
-
-        const interval = setInterval(fetchEvents, 2000); // Poll every 2s
+        const interval = setInterval(fetchEvents, 2000);
         return () => clearInterval(interval);
     }, [campaignId]);
 
@@ -366,7 +408,7 @@ export default function PlayPage() {
 
 
     return (
-        <div className="flex h-screen w-full bg-background overflow-hidden flex-row relative">
+        <div className="flex h-screen w-full bg-background overflow-hidden flex-row relative supports-[height:100dvh]:h-[100dvh]">
             {/* C.O.R.T.E.X. Visual Layer */}
             <CortexOverlay events={events} />
 
@@ -396,10 +438,7 @@ export default function PlayPage() {
 
             {context?.campaign?.roomCode && <RevealOverlay roomCode={context.campaign.roomCode} />}
 
-            {/* TOP: Squad Monitor (Overseer) - Moved down to avoid Header overlap */}
-            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-4xl pt-2 pointer-events-none px-4">
-                <SquadMonitor campaignId={campaignId} />
-            </div>
+
 
             {/* ARCHIVES: Omni Search */}
             <OmniSearch
@@ -414,32 +453,40 @@ export default function PlayPage() {
                 onClose={() => setViewingGrimoireItem(null)}
             />
 
-            {/* LEFT: Quick Sheet */}
+            {/* LEFT: Quick Sheet Overlay */}
             <QuickSheet
                 campaignId={campaignId}
                 onAction={handleAction}
                 collapsed={sheetCollapsed}
                 onToggle={() => setSheetCollapsed(!sheetCollapsed)}
             />
+            {/* Toggle Button for QuickSheet (Visible when collapsed) */}
+            {sheetCollapsed && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-[60]">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-24 w-6 bg-black/50 border-y border-r border-white/10 rounded-r-xl hover:bg-primary/20 hover:text-primary transition-all flex items-center justify-center"
+                        onClick={() => setSheetCollapsed(false)}
+                    >
+                        <div className="rotate-90 text-[10px] font-bold tracking-widest uppercase whitespace-nowrap">AGENTE</div>
+                    </Button>
+                </div>
+            )}
 
             {/* CENTER: Game Board */}
             {/* CENTER: Game Board (War Room) */}
             <div className="flex-1 bg-neutral-900 relative flex flex-col justify-center items-center text-muted-foreground overflow-hidden">
+                {/* Squad Monitor (Overseer) - Centered in Game Board */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-3xl pt-2 pointer-events-none px-4">
+                    <SquadMonitor campaignId={campaignId} />
+                </div>
+
                 <InteractiveMap
                     className="absolute inset-0 z-0"
-                    tokens={characters.map(c => ({
-                        id: c.id,
-                        name: c.name,
-                        avatarUrl: c.avatarUrl,
-                        x: (Math.random() * 40) - 20, // Mock init position (spread horizontally)
-                        y: (Math.random() * 20) - 10,
-                        color: c.id === 'player-1' ? '#ef4444' : '#3b82f6'
-                    }))}
-                    onTokenMove={(id, x, y) => {
-                        console.log("Moved", id, x, y);
-                        // Optimistic update would go here, syncing back to server
-                    }}
+                    tokens={mapTokens}
                     pins={pins}
+                    onTokenMove={handleTokenMove}
                     onPinCreate={handlePinCreate}
                 />
 

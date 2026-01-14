@@ -25,6 +25,8 @@ model Campaign {
   sessions    Session[]
   combat      Combat?
   worldEvents WorldEvent[]
+  mapTokens   MapToken[]
+  mapPins     MapPin[]
 
   @@index([worldId])
 }
@@ -404,6 +406,71 @@ model ActionRequest {
   status     String   @default("PENDING") @db.VarChar(16)
   createdAt  DateTime @default(now())
 
-  @@index([campaignId, status, createdAt])
   @@index([roomCode, status, createdAt])
+}
+
+model MapToken {
+  id          String   @id @default(cuid())
+  campaignId  String
+  x           Float
+  y           Float
+  scale       Float    @default(1)
+  rotation    Float    @default(0)
+  type        String   @default("character") // character, enemy, prop
+  referenceId String?  // ID of the character/npc if linked
+  imageUrl    String?
+  label       String?
+  status      String?  // active, defeated, hidden
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+}
+
+model MapPin {
+  id          String   @id @default(cuid())
+  campaignId  String
+  x           Float
+  y           Float
+  type        String   @default("poi") // poi, danger, secret, loot
+  title       String?
+  description String?
+  color       String?  @default("#ffffff")
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+}
+
+model AiChatSession {
+  id         String   @id @default(cuid())
+  userId     String   @db.VarChar(120) // Clerk/Auth ID
+  campaignId String?
+  worldId    String?
+  title      String   @db.VarChar(200)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  messages AiChatMessage[]
+
+  @@index([userId])
+  @@index([campaignId])
+}
+
+model AiChatMessage {
+  id        String        @id @default(cuid())
+  sessionId String
+  role      String        @db.VarChar(16) // user, assistant, system
+  content   String        @db.Text
+  intent    String?       @db.VarChar(50) // ROLL, ATTACK, etc
+  meta      Json?         // Parsed parameters, execution result
+  createdAt DateTime      @default(now())
+
+  session AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }

@@ -45,6 +45,8 @@ import {
 } from "@/lib/validators";
 import { Textarea } from "@/components/ui/textarea";
 import { CombatPanel } from "@/components/combat/combat-panel";
+import { AgentCard } from "@/components/dashboard/agent-card";
+import { NpcCard } from "@/components/dashboard/npc-card";
 
 type Campaign = {
   id: string;
@@ -703,8 +705,8 @@ export default function CampaignPage() {
           <TabsList className="bg-white/5 text-foreground">
             <TabsTrigger value="characters">Personagens</TabsTrigger>
             <TabsTrigger value="npcs">NPCs</TabsTrigger>
-            <TabsTrigger value="compendium">CompÃªndio</TabsTrigger>
-            <TabsTrigger value="sessions">SessÃµes</TabsTrigger>
+            <TabsTrigger value="compendium">Compêndio</TabsTrigger>
+            <TabsTrigger value="sessions">Sessões</TabsTrigger>
             <TabsTrigger value="combat">Combate</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
@@ -911,73 +913,23 @@ export default function CampaignPage() {
                 <Link
                   key={character.id}
                   href={`/app/personagens/${character.id}`}
-                  className="block"
+                  className="block h-full"
                 >
-                  <Card className="chrome-panel group rounded-2xl border-white/10 bg-white/5 transition duration-150 hover:-translate-y-1 hover:border-primary/25">
-                    <CardHeader className="flex flex-row items-start justify-between gap-2">
-                      <div className="flex items-start gap-3">
-                        {character.avatarUrl ? (
-                          <img
-                            src={character.avatarUrl}
-                            alt={character.name}
-                            className="h-12 w-12 rounded-full border border-white/10 object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-muted-foreground">
-                            {character.name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg">{character.name}</CardTitle>
-                          <CardDescription>
-                            {character.role || "Sem papel definido"}
-                          </CardDescription>
-                          {character.description ? (
-                            <p className="text-xs text-muted-foreground line-clamp-2">
-                              {character.description}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                      <Badge className="border-primary/30 bg-primary/10 text-primary">
-                        Nivel {character.level}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-muted-foreground">
-                      <div className="flex items-center justify-between">
-                        <span>
-                          Atualizado{" "}
-                          {new Date(character.updatedAt).toLocaleDateString("pt-BR")}
-                        </span>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground transition duration-150 group-hover:translate-x-1 group-hover:text-primary" />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openEditCharacter(character);
-                          }}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            void handleDeleteCharacter(character);
-                          }}
-                        >
-                          Apagar
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <AgentCard
+                    character={{
+                      id: character.id,
+                      name: character.name,
+                      class: character.className || character.role || "Agente",
+                      level: character.level,
+                      avatarUrl: character.avatarUrl || undefined,
+                      hp: { current: 10, max: 20 }, // Mock values since they aren't in the type yet
+                      pm: { current: 5, max: 10 },
+                      attributes: {} // Pass empty attributes to satisfy stricter types if needed
+                    }}
+                    onSelect={() => { }} // Link handles navigation
+                    className="w-full h-48"
+                  />
+                  {/* Edit/Delete implementation would need to be moved outside the card or overlayed differently */}
                 </Link>
               ))}
             </div>
@@ -1213,73 +1165,23 @@ export default function CampaignPage() {
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {sortedNpcs.map((npc) => {
-                const tags = npc.tags
-                  ? npc.tags
-                    .split(",")
-                    .map((tag) => tag.trim())
-                    .filter(Boolean)
-                  : [];
-                return (
-                  <Card
-                    key={npc.id}
-                    className="chrome-panel rounded-2xl border-white/10 bg-white/5"
-                  >
-                    {npc.imageUrl ? (
-                      <img
-                        src={npc.imageUrl}
-                        alt={npc.name}
-                        className="h-36 w-full rounded-t-2xl border-b border-white/10 object-cover"
-                      />
-                    ) : null}
-                    <CardHeader className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-lg">{npc.name}</CardTitle>
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {npc.type === "enemy" ? "Inimigo" : "NPC"}
-                        </Badge>
-                      </div>
-                      <CardDescription>
-                        PV {npc.hpMax} / Defesa {npc.defenseFinal} / Ataque {npc.damageFormula}
-                      </CardDescription>
-                      {npc.description ? (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {npc.description}
-                        </p>
-                      ) : null}
-                      {tags.length ? (
-                        <div className="flex flex-wrap gap-2">
-                          {tags.map((tag) => (
-                            <Badge
-                              key={tag}
-                              variant="outline"
-                              className="text-muted-foreground"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : null}
-                    </CardHeader>
-                    <CardContent className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => void handleAddNpcToCombat(npc)}>
-                        Adicionar ao combate
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => openEditNpc(npc)}>
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => void handleDeleteNpc(npc)}
-                      >
-                        Apagar
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {sortedNpcs.map((npc) => (
+                <NpcCard
+                  key={npc.id}
+                  npc={{
+                    id: npc.id,
+                    name: npc.name,
+                    type: npc.type,
+                    hpMax: npc.hpMax || 10,
+                    defenseFinal: npc.defenseFinal || 10,
+                    damageFormula: npc.damageFormula,
+                    imageUrl: npc.imageUrl || undefined,
+                    description: npc.description || undefined
+                  }}
+                  onSelect={() => openEditNpc(npc)}
+                  onAddToCombat={() => void handleAddNpcToCombat(npc)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>

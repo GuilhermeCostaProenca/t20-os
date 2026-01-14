@@ -60,24 +60,38 @@ export function SquadMonitor({ campaignId, onSelect }: SquadMonitorProps) {
         );
     }
 
+    // Simplified Grant Handler
+    const handleGrant = (id: string, type: 'hp' | 'pm' | 'san', amount: number) => {
+        // Optimistic Update (Real impl would call API)
+        setAgents(prev => prev.map(a => {
+            if (a.id !== id) return a;
+            const key = type as keyof typeof a;
+            // logic to update nested val... simplify for prototype:
+            return a; // Placeholder
+        }));
+        console.log(`GRANT ${type.toUpperCase()} ${amount} to ${id}`);
+    };
+
     return (
         <div className="flex items-start justify-center gap-2 p-2 w-full overflow-x-auto pointer-events-none">
-            {/* Pointer events auto only on cards so we can click through the empty space if needed, 
-                but this is top bar so maybe not needed to be invisible. */}
-
             {agents.map(agent => {
                 const hpPct = (agent.hp.current / agent.hp.max) * 100;
                 const pmPct = (agent.pm.current / agent.pm.max) * 100;
+                // Mock Sanity for now
+                const sanCurrent = 50;
+                const sanMax = 100;
+                const sanPct = (sanCurrent / sanMax) * 100;
+
                 const isDying = agent.hp.current <= 0;
 
                 return (
                     <div
                         key={agent.id}
-                        onClick={() => onSelect?.(agent.id)}
                         className={cn(
-                            "pointer-events-auto cursor-pointer group relative w-40 bg-black/60 backdrop-blur-md border border-white/10 rounded overflow-hidden transition-all hover:scale-105 hover:border-primary/50",
+                            "pointer-events-auto group relative w-48 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg overflow-hidden transition-all hover:scale-105 hover:border-primary/50 hover:bg-zinc-900 shadow-lg",
                             isDying && "border-red-500/50 animate-pulse bg-red-950/20"
                         )}
+                        onClick={() => onSelect?.(agent.id)}
                     >
                         {/* Compact Layout */}
                         <div className="p-2 flex gap-3 items-center">
@@ -94,34 +108,43 @@ export function SquadMonitor({ campaignId, onSelect }: SquadMonitorProps) {
                             </div>
 
                             {/* Vitals */}
-                            <div className="flex-1 min-w-0 space-y-1">
-                                <div className="flex justify-between items-baseline">
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex justify-between items-center h-4">
                                     <span className="text-xs font-bold truncate text-white/90">{agent.name}</span>
                                     {isDying && <Skull className="w-3 h-3 text-red-500" />}
                                 </div>
 
-                                {/* HP Bar */}
-                                <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
-                                    <div
-                                        className={cn("h-full transition-all", isDying ? "bg-red-600" : "bg-green-500")}
-                                        style={{ width: `${hpPct}%` }}
-                                    />
-                                </div>
-                                {/* PM Bar */}
-                                <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-blue-500 transition-all"
-                                        style={{ width: `${pmPct}%` }}
-                                    />
+                                {/* Bars Container */}
+                                <div className="space-y-1 relative">
+                                    {/* HP Bar */}
+                                    <div className="group/bar relative h-2 w-full bg-black/50 rounded-full overflow-hidden">
+                                        <div className={cn("h-full transition-all", isDying ? "bg-red-600" : "bg-green-500")} style={{ width: `${hpPct}%` }} />
+                                        {/* Hover Controls */}
+                                        <div className="absolute inset-0 flex opacity-0 group-hover/bar:opacity-100 bg-black/60 items-center justify-center gap-4 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'hp', -5) }} className="text-red-500 font-bold text-[10px] hover:scale-125">-</button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'hp', 5) }} className="text-green-500 font-bold text-[10px] hover:scale-125">+</button>
+                                        </div>
+                                    </div>
+
+                                    {/* PM Bar */}
+                                    <div className="group/bar relative h-2 w-full bg-black/50 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500 transition-all" style={{ width: `${pmPct}%` }} />
+                                        <div className="absolute inset-0 flex opacity-0 group-hover/bar:opacity-100 bg-black/60 items-center justify-center gap-4 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'pm', -2) }} className="text-red-500 font-bold text-[10px] hover:scale-125">-</button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'pm', 2) }} className="text-blue-500 font-bold text-[10px] hover:scale-125">+</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Sanity Bar (New) */}
+                                    <div className="group/bar relative h-1.5 w-full bg-black/50 rounded-full overflow-hidden mt-1">
+                                        <div className="h-full bg-purple-500 transition-all" style={{ width: `${sanPct}%` }} />
+                                        <div className="absolute inset-0 flex opacity-0 group-hover/bar:opacity-100 bg-black/60 items-center justify-center gap-4 transition-opacity">
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'san', -2) }} className="text-red-500 font-bold text-[10px] hover:scale-125">-</button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleGrant(agent.id, 'san', 2) }} className="text-purple-500 font-bold text-[10px] hover:scale-125">+</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Hover Details overlay? Or keep it simple. */}
-                        <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-[10px] bg-black/80 px-1 rounded text-white border border-white/20">
-                                {agent.hp.current} / {agent.pm.current}
-                            </span>
                         </div>
                     </div>
                 );
