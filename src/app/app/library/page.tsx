@@ -1,4 +1,5 @@
 import Link from "next/link";
+export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
