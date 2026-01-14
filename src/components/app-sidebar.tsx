@@ -11,6 +11,7 @@ import {
   ShieldHalf,
   Sparkles,
   UserCircle2,
+  Users as UsersIcon,
 } from "lucide-react";
 
 // ... imports
@@ -22,7 +23,9 @@ import { Separator } from "@/components/ui/separator";
 import { Brand } from "./brand";
 
 const baseNavItems = [
-  { id: "mundos", href: "/app", label: "Meus Mundos", icon: Globe2 },
+  { id: "dashboard", href: "/app", label: "Dashboard", icon: LayoutDashboard },
+  { id: "compendium", href: "/app/compendium", label: "Compêndio", icon: BookOpenText },
+  { id: "community", href: "/app/community", label: "Comunidade", icon: UsersIcon }, // Using UsersIcon imported below
 ];
 
 const worldNavItems = [

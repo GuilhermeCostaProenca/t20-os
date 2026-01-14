@@ -1,25 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, NotebookPen, QrCode, Shield, Sparkles, Swords } from "lucide-react";
+import { Clock3, ExternalLink, NotebookPen, QrCode, Shield, Sparkles, Swords, User, Zap } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card"; // Reduced Card usage
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { generateQrDataUrl } from "@/lib/qr";
 import { useSession } from "./session-context";
 import { SessionSummaryButton } from "./session-summary-button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 function formatElapsed(ms: number) {
   const totalSeconds = Math.floor(ms / 1000);
@@ -167,255 +169,177 @@ export function SessionDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button className="bg-primary text-primary-foreground shadow-[0_0_24px_rgba(226,69,69,0.35)] hover:bg-primary/90">
           <Sparkles className="h-4 w-4" />
-          <span className="hidden sm:inline">Modo sessao</span>
+          <span className="hidden sm:inline">Modo Sessão</span>
         </Button>
-      </DialogTrigger>
-      <DialogContent className="chrome-panel flex max-h-[85vh] w-[95vw] max-w-5xl flex-col overflow-hidden border-white/10 bg-card/90 p-0 text-left backdrop-blur">
-        <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
-          <DialogTitle>Modo Sessão</DialogTitle>
-          <DialogDescription>
-            Timer, rolagens, NPCs, notas rapidas e revelacoes para jogadores.
-          </DialogDescription>
-        </DialogHeader>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-zinc-950 border-white/10">
+        <SheetHeader className="px-6 py-4 border-b border-white/10 bg-black/20">
+          <SheetTitle className="flex items-center gap-2 text-primary">
+            <Zap className="h-4 w-4" /> Centro de Comando
+          </SheetTitle>
+          <SheetDescription className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono text-[10px] tracking-wider bg-white/5 border-white/10">
+              COD: {roomCode || "----"}
+            </Badge>
+            {roomLink && (
+              <span className="text-xs text-muted-foreground w-full truncate text-right">
+                ...{roomLink.slice(-15)}
+              </span>
+            )}
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-wrap items-center gap-3 px-6">
-            <Badge className="border-primary/25 bg-primary/10 text-primary">Room code: {roomCode || "----"}</Badge>
-            <Button variant="outline" size="sm" onClick={copyLink} disabled={!roomLink}>
-              Copiar link
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleGenerateQr} disabled={!roomLink || qrLoading}>
-              <QrCode className="h-4 w-4" />
-              QR Code
-            </Button>
-            {qrData ? (
-              <img
-                src={qrData}
-                alt="QR Code para jogadores"
-                className="h-20 w-20 rounded-lg border border-white/10 bg-white/5 p-1"
-              />
-            ) : null}
-            {revealStatus ? <span className="text-xs text-muted-foreground">{revealStatus}</span> : null}
+        <ScrollArea className="flex-1 px-6 py-4">
+          <div className="space-y-6 pb-20">
+
+            {/* Timer Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+                  <Clock3 className="h-3 w-3" /> Cronômetro
+                </h3>
+                <div className="text-2xl font-mono font-bold text-primary">{formatElapsed(elapsedMs)}</div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={state.startedAt ? toggleTimer : startSession} className="flex-1 bg-white/10 hover:bg-white/20 text-white">
+                  {timerLabel}
+                </Button>
+                <Button size="sm" variant="outline" onClick={resetTimer} disabled={!state.startedAt} className="border-white/10">
+                  Reset
+                </Button>
+              </div>
+
+              <div className="flex gap-2 p-1 bg-black/40 rounded-lg">
+                <Button
+                  variant={visibility === "players" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setVisibility("players")}
+                  className="flex-1 h-7 text-xs"
+                >
+                  <Shield className="h-3 w-3 mr-1" /> Público
+                </Button>
+                <Button
+                  variant={visibility === "master" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setVisibility("master")}
+                  className="flex-1 h-7 text-xs"
+                >
+                  <User className="h-3 w-3 mr-1" /> Privado
+                </Button>
+              </div>
+            </div>
+
+            <Separator className="border-white/5" />
+
+            {/* Quick Shortcuts */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-white/80">Atalhos de Log</h3>
+
+              <div className="flex bg-white/5 rounded-lg border border-white/10 p-1">
+                <Input
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="Nota rápida..."
+                  className="border-0 bg-transparent h-9 focus-visible:ring-0 placeholder:text-zinc-600"
+                />
+                <Button size="sm" onClick={() => { addNote(note); setNote(""); }} disabled={!note.trim()} className="h-9">
+                  <NotebookPen className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <Input
+                    value={npc}
+                    onChange={e => setNpc(e.target.value)}
+                    placeholder="NPC..."
+                    className="h-8 text-xs bg-white/5 border-white/10"
+                  />
+                  <Button size="sm" variant="outline" onClick={() => { addNpcMention(npc); setNpc(""); }} disabled={!npc.trim()} className="h-7 text-xs">
+                    Mencionar NPC
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    value={item}
+                    onChange={e => setItem(e.target.value)}
+                    placeholder="Item..."
+                    className="h-8 text-xs bg-white/5 border-white/10"
+                  />
+                  <Button size="sm" variant="outline" onClick={() => { addItemMention(item); setItem(""); }} disabled={!item.trim()} className="h-7 text-xs">
+                    Mencionar Item
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="border-white/5" />
+
+            {/* Revelations */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white/80 flex items-center justify-between">
+                <span>Transmissão</span>
+                {roomLink && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(roomLink, "_blank")}>
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyLink}>
+                      <QrCode className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </h3>
+
+              <select
+                value={revealType}
+                onChange={(e) => setRevealType(e.target.value as typeof revealType)}
+                className="w-full h-8 rounded-md border border-white/10 bg-black/40 px-3 text-xs text-white"
+              >
+                <option value="note">Nota Pública</option>
+                <option value="npc">Revelar NPC</option>
+                <option value="item">Revelar Item</option>
+                <option value="image">Mostrar Imagem</option>
+              </select>
+
+              <Input value={revealTitle} onChange={e => setRevealTitle(e.target.value)} placeholder="Título..." className="h-8 text-xs bg-white/5 border-white/10" />
+              <Textarea value={revealContent} onChange={e => setRevealContent(e.target.value)} placeholder="Conteúdo da revelação..." rows={2} className="text-xs bg-white/5 border-white/10" />
+
+              <Button onClick={handleRevealSubmit} className="w-full text-xs" disabled={!roomCode}>
+                Transmitir para Players
+              </Button>
+            </div>
           </div>
+        </ScrollArea>
 
-          <div className="grid gap-4 px-6 pb-6 md:grid-cols-[1.2fr_1fr]">
-            <Card className="chrome-panel border-white/10 bg-black/30">
-              <CardHeader className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock3 className="h-5 w-5 text-primary" />
-                    <CardTitle>Timer</CardTitle>
-                  </div>
-                  <Badge className="border-primary/25 bg-primary/10 text-primary">
-                    {visibility === "players" ? "Visivel aos jogadores" : "So mestre"}
-                  </Badge>
-                </div>
-                <CardDescription>Controle rapido para encontros presenciais.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-4xl font-black tracking-tight">{formatElapsed(elapsedMs)}</div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={state.startedAt ? toggleTimer : startSession} className="shadow-[0_0_18px_rgba(226,69,69,0.3)]">
-                    {timerLabel}
-                  </Button>
-                  <Button variant="outline" onClick={resetTimer} disabled={!state.startedAt}>
-                    Resetar
-                  </Button>
-                  <Button variant="destructive" onClick={endSession} disabled={!state.startedAt}>
-                    Encerrar
-                  </Button>
-                  <Button
-                    variant={visibility === "players" ? "default" : "outline"}
-                    onClick={() => setVisibility("players")}
-                    className="gap-2"
-                  >
-                    <Shield className="h-4 w-4" />
-                    Jogadores
-                  </Button>
-                  <Button
-                    variant={visibility === "master" ? "default" : "outline"}
-                    onClick={() => setVisibility("master")}
-                    className="gap-2"
-                  >
-                    <NotebookPen className="h-4 w-4" />
-                    Mestre
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="chrome-panel border-white/10 bg-black/30">
-              <CardHeader className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Atalhos rapidos</CardTitle>
-                  <Badge variant="outline" className="text-muted-foreground">
-                    Log automatico
-                  </Badge>
-                </div>
-                <CardDescription>Acoes curtas que alimentam o log e os recentes.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Nota rapida</label>
-                  <div className="flex gap-2">
-                    <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Registrar pista, decisao ou evento" />
-                    <Button
-                      onClick={() => {
-                        addNote(note);
-                        setNote("");
-                      }}
-                      disabled={!note.trim()}
-                    >
-                      Salvar
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">NPC citado</label>
-                  <div className="flex gap-2">
-                    <Input value={npc} onChange={(e) => setNpc(e.target.value)} placeholder="Nome do NPC" />
-                    <Button
-                      onClick={() => {
-                        addNpcMention(npc);
-                        setNpc("");
-                      }}
-                      disabled={!npc.trim()}
-                    >
-                      Registrar
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Item citado</label>
-                  <div className="flex gap-2">
-                    <Input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Item ou artefato" />
-                    <Button
-                      onClick={() => {
-                        addItemMention(item);
-                        setItem("");
-                      }}
-                      disabled={!item.trim()}
-                    >
-                      Registrar
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Rolagem d20</label>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" value={mod} onChange={(e) => setMod(Number(e.target.value) || 0)} className="w-20" />
-                    <Button className="gap-2" onClick={() => rollD20(mod)}>
-                      <Swords className="h-4 w-4" />
-                      Rolar
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="px-6 pb-6">
-            <Card className="chrome-panel border-white/10 bg-black/30">
-              <CardHeader className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Revelar para jogadores</CardTitle>
-                  <Badge variant="outline" className="text-muted-foreground">
-                    /play/{roomCode || "----"}
-                  </Badge>
-                </div>
-                <CardDescription>Envie NPCs, itens, imagens ou notas curtas.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid gap-3 md:grid-cols-4">
-                  <div className="space-y-1 md:col-span-1">
-                    <label className="text-sm text-muted-foreground">Tipo</label>
-                    <select
-                      value={revealType}
-                      onChange={(e) => setRevealType(e.target.value as typeof revealType)}
-                      className="h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 text-sm"
-                    >
-                      <option value="npc">NPC</option>
-                      <option value="item">Item</option>
-                      <option value="image">Imagem</option>
-                      <option value="note">Nota</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1 md:col-span-3">
-                    <label className="text-sm text-muted-foreground">Titulo</label>
-                    <Input value={revealTitle} onChange={(e) => setRevealTitle(e.target.value)} placeholder="Ex.: Serpente Rubra" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm text-muted-foreground">Texto curto</label>
-                  <Textarea value={revealContent} onChange={(e) => setRevealContent(e.target.value)} rows={3} placeholder="Resumo rapido, descricao ou pista" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm text-muted-foreground">URL da imagem (opcional)</label>
-                  <Input value={revealImage} onChange={(e) => setRevealImage(e.target.value)} placeholder="https://..." />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button onClick={handleRevealSubmit} className="shadow-[0_0_18px_rgba(226,69,69,0.3)]">
-                    Mostrar
-                  </Button>
-                  {revealStatus ? <span className="text-xs text-muted-foreground">{revealStatus}</span> : null}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Separator className="border-white/10" />
-
-          <div className="px-6 pb-3">
+        {/* Footer Log */}
+        <div className="h-64 border-t border-white/10 bg-black/40 flex flex-col">
+          <div className="px-4 py-2 border-b border-white/5 flex justify-between items-center bg-zinc-900/50">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Log de Eventos</span>
             <SessionSummaryButton />
           </div>
-
-          <div className="max-h-72 overflow-y-auto px-6 pb-6">
-            <div className="flex items-center justify-between py-4">
-              <h3 className="text-sm uppercase tracking-[0.16em] text-primary">Log da sessao</h3>
-              <Badge variant="outline" className="text-muted-foreground">
-                {events.length} eventos
-              </Badge>
-            </div>
-            <div className="space-y-3">
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-2">
               {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhum evento registrado ainda. Comece a sessao ou adicione uma nota.
-                </p>
+                <p className="text-xs text-zinc-500 text-center py-4">Sessão aguardando início...</p>
               ) : (
-                events.map((event) => {
-                  const label = (event.displayType ?? event.type ?? "").toString().replace(/_/g, " ");
-                  return (
-                    <div
-                      key={event.id}
-                      className="flex items-start justify-between rounded-lg border border-white/5 bg-white/5 px-3 py-2"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs capitalize text-primary">
-                            {label}
-                          </Badge>
-                          <Badge variant="outline" className="text-[11px] uppercase tracking-[0.14em]">
-                            {event.visibility === "players" ? "Mesa" : "Mestre"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">{event.time}</span>
-                        </div>
-                        <p className="text-sm text-foreground">{event.message}</p>
-                      </div>
-                      {event.breakdown?.toHit ? (
-                        <span className="text-sm font-semibold text-primary">{event.breakdown.toHit.total}</span>
-                      ) : null}
-                    </div>
-                  );
-                })
+                events.map(evt => (
+                  <div key={evt.id} className="text-xs flex gap-2">
+                    <span className="text-zinc-600 font-mono flex-shrink-0">{evt.time}</span>
+                    <span className={cn("text-zinc-300", evt.visibility === "master" && "text-yellow-500/80")}>
+                      {evt.message}
+                    </span>
+                  </div>
+                ))
               )}
             </div>
-          </div>
+          </ScrollArea>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
