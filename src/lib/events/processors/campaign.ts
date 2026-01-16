@@ -34,7 +34,21 @@ export async function applyCampaignCreated(tx: Tx, event: any) {
         throw new Error("Campaign ID (entityId) is required for creation event");
     }
 
-    const roomCode = await createUniqueRoomCode(tx);
+    // If roomCode is not in payload, we check if it already exists or generate new one
+    // But since this runs inside a transaction where we might have just created it in dispatcher:
+    // We should fetching existing first.
+
+    // Efficiency: We just upsert. If it exists, we keep old roomCode (unless payload forces it?).
+    // Payload doesn't have roomCode usually.
+
+    // We need to know if we are creating or updating to handle roomCode generation safely.
+    // simpler:
+    const existing = await tx.campaign.findUnique({ where: { id: campaignId } });
+    let roomCode = existing?.roomCode;
+
+    if (!roomCode) {
+        roomCode = await createUniqueRoomCode(tx);
+    }
 
     await tx.campaign.upsert({
         where: { id: campaignId },
@@ -43,9 +57,6 @@ export async function applyCampaignCreated(tx: Tx, event: any) {
             description: payload.description,
             system: payload.system,
             rulesetId: payload.rulesetId,
-            // roomCode is preserved on update to maintain stability if possible, 
-            // or we accept it might rotate if logic dictates. 
-            // Ideally roomCode should be in payload, but for now we preserve existing if present.
         },
         create: {
             id: campaignId,

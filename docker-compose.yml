@@ -10,6 +10,28 @@ services:
       - "5432:5432"
     volumes:
       - t20os_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U t20 -d t20os"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: t20os_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Use the container name 'db' as the host only inside the docker network
+      DATABASE_URL: "postgresql://t20:t20@db:5432/t20os?schema=public"
+      DIRECT_URL: "postgresql://t20:t20@db:5432/t20os?schema=public"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   t20os_pg:

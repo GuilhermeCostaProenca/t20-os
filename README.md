@@ -2,26 +2,34 @@
 
 Ferramenta privada para rodar mesas Tormenta 20 com Next.js (App Router) + TypeScript, Tailwind + shadcn/ui e Prisma com PostgreSQL.
 
-## Como rodar
+## Como rodar (Docker Only)
 
-1. Configure o `.env` com `DATABASE_URL` (já existe um exemplo).
-2. Suba o banco:
+Este projeto foi configurado para rodar completamente em Docker, tanto o banco de dados quanto a aplicação, simulando um ambiente de servidor local.
+
+### Quick Start
+1. **Suba tudo (App + Banco)**:
    ```bash
-   docker compose up -d
+   docker-compose up -d
    ```
-3. Instale dependências:
+   > O app estará disponível em `http://localhost:3000`.
+   > O banco de dados estará acessível internamente pelo app.
+
+2. **Parar tudo**:
    ```bash
-   npm install
+   docker-compose down
    ```
-4. Rode as migrações Prisma:
-   ```bash
-   npx prisma migrate dev --name init
-   ```
-5. Suba o app:
-   ```bash
-   npm run dev
-   ```
-6. Acesse `http://localhost:3000`.
+
+### Desenvolvimento
+- **Hot Reload**: O código local é espelhado para dentro do container. **Você NÃO precisa dar build a cada mudança.** Basta salvar o arquivo e o navegador atualizará.
+- **Instalar Dependências**: Se você adicionar uma nova lib no `package.json`, precisará rebuildar:
+  ```bash
+  docker-compose up -d --build
+  ```
+- **Banco de Dados**: O Prisma conecta automaticamente. Se mudar o schema, rode:
+  ```bash
+  npx prisma db push
+  ```
+
 
 ## Rotas principais
 

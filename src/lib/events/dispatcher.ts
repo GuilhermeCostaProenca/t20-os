@@ -28,31 +28,42 @@ export async function dispatchEvent(params: CreateEventParams) {
         }
     }
 
+    // Pre-calculate expensive things outside transaction
+    let newRoomCode: string | undefined;
+    if (type === "CAMPAIGN_CREATED" && campaignId) {
+        const { createUniqueRoomCode } = await import("./processors/campaign");
+        // Note: We are running this outside the MAIN transaction to avoid hold time.
+        // Uniqueness race condition is rare enough for this MVP.
+        // To be strictly safe, we would need to pass prisma instance, not tx, or retry.
+        newRoomCode = await createUniqueRoomCode(prisma);
+    }
+
     // wrapping in transaction to ensure Ledger + Projection atomicity
     return prisma.$transaction(async (tx) => {
         // 0. Bootstrap World for FK constraint
         if (type === "WORLD_CREATED") {
             // We create a shell to satisfy the WorldEvent foreign key.
-            // The processor will update this with real data immediately after.
-            await tx.world.create({
-                data: {
-                    id: worldId,
-                    title: "Pending Initialization...",
-                },
-            });
+            const existing = await tx.world.findUnique({ where: { id: worldId }, select: { id: true } });
+            if (!existing) {
+                await tx.world.create({
+                    data: {
+                        id: worldId,
+                        title: "Pending Initialization...",
+                    },
+                });
+            }
         }
 
-        if (type === "CAMPAIGN_CREATED") {
-            // Bootstrap Campaign to satisfy FK if event links to itself
-            if (campaignId) {
-                const { createUniqueRoomCode } = await import("./processors/campaign");
-                const roomCode = await createUniqueRoomCode(tx);
+        if (type === "CAMPAIGN_CREATED" && campaignId && newRoomCode) {
+            // Bootstrap Campaign if it doesn't exist
+            const existing = await tx.campaign.findUnique({ where: { id: campaignId }, select: { id: true } });
+            if (!existing) {
                 await tx.campaign.create({
                     data: {
                         id: campaignId,
                         worldId,
                         name: "Pending...",
-                        roomCode,
+                        roomCode: newRoomCode,
                     }
                 });
             }
@@ -69,7 +80,6 @@ export async function dispatchEvent(params: CreateEventParams) {
                 actorId,
                 targetId: entityId, // Map entityId to targetId
                 payload: payload as any, // Prisma Json type
-                // optional legacy fields can be null
             },
         });
 
@@ -77,5 +87,8 @@ export async function dispatchEvent(params: CreateEventParams) {
         await processEvent(tx, event);
 
         return event;
+    }, {
+        maxWait: 5000, // Wait max 5s for connection
+        timeout: 10000 // Transaction runs for max 10s
     });
 }
